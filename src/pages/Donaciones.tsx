@@ -1,10 +1,15 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { useAuth } from '../contexts/AuthContext'
 import { useDonacion } from '../contexts/DonacionContext'
+import type { Donacion } from '../types'
+import { mockDonaciones } from '../lib/mockData'
+import api from '../lib/axios'
 
 export default function Donaciones() {
   const { user } = useAuth()
-  const { donaciones, causasActivas, addDonacion } = useDonacion()
+  const { causasActivas } = useDonacion()
+  const [donaciones, setDonaciones] = useState<Donacion[]>([])
+  const [historialLoading, setHistorialLoading] = useState(true)
   const [showForm, setShowForm] = useState(false)
   const [form, setForm] = useState({
     causaId: '',
@@ -15,32 +20,72 @@ export default function Donaciones() {
   const [success, setSuccess] = useState(false)
   const [loading, setLoading] = useState(false)
 
-  const misDonaciones = user
-    ? donaciones.filter(
-        (d) => !d.anonima && (d.donadorEmail === user.email || d.donadorNombre === user.nombre)
-      )
-    : []
+  useEffect(() => {
+    async function fetchDonaciones() {
+      try {
+        const { data } = await api.get<Donacion[]>('/api/donaciones')
+        setDonaciones(data)
+      } catch (err: unknown) {
+        const hasResponse = err && typeof err === 'object' && 'response' in err
+        if (!hasResponse) {
+          const fallback = user
+            ? mockDonaciones.filter(
+                (d) => !d.anonima && (d.donadorEmail === user.email || d.donadorNombre === user.nombre)
+              )
+            : []
+          setDonaciones(fallback)
+        }
+      } finally {
+        setHistorialLoading(false)
+      }
+    }
+    fetchDonaciones()
+  }, [user])
+
+  const misDonaciones = donaciones.filter(
+    (d) => !d.anonima && (d.donadorEmail === user?.email || d.donadorNombre === user?.nombre)
+  )
 
   const miTotal = misDonaciones.reduce((a, d) => a + d.monto, 0)
 
   async function handleDonar(e: React.FormEvent) {
     e.preventDefault()
-    if (!form.causaId || !form.monto) return
+    if (!form.causaId || !form.monto || !user) return
     setLoading(true)
-    await new Promise((r) => setTimeout(r, 600))
 
     const causa = causasActivas.find((c) => c.id === Number(form.causaId))
-    if (!causa || !user) return
+    if (!causa) { setLoading(false); return }
 
-    addDonacion({
-      donadorNombre: form.anonima ? 'Anónimo' : user.nombre,
-      donadorEmail: form.anonima ? undefined : user.email,
-      monto: Number(form.monto),
+    const payload = {
       causaId: causa.id,
-      causaTitulo: causa.titulo,
+      monto: Number(form.monto),
       mensaje: form.mensaje,
       anonima: form.anonima,
-    })
+    }
+
+    try {
+      const { data: nueva } = await api.post<Donacion>('/api/donaciones', payload)
+      setDonaciones((prev) => [nueva, ...prev])
+    } catch (err: unknown) {
+      const hasResponse = err && typeof err === 'object' && 'response' in err
+      if (!hasResponse) {
+        const nueva: Donacion = {
+          id: Date.now(),
+          donadorNombre: form.anonima ? 'Anónimo' : user.nombre,
+          donadorEmail: form.anonima ? undefined : user.email,
+          monto: Number(form.monto),
+          causaId: causa.id,
+          causaTitulo: causa.titulo,
+          fecha: new Date().toISOString(),
+          mensaje: form.mensaje,
+          anonima: form.anonima,
+        }
+        setDonaciones((prev) => [nueva, ...prev])
+      } else {
+        setLoading(false)
+        return
+      }
+    }
 
     setLoading(false)
     setSuccess(true)
@@ -191,7 +236,9 @@ export default function Donaciones() {
             <span className="text-xs text-gray-400">{misDonaciones.length} donaciones</span>
           </div>
 
-          {misDonaciones.length === 0 ? (
+          {historialLoading ? (
+            <div className="py-16 text-center text-gray-400 text-sm">Cargando historial...</div>
+          ) : misDonaciones.length === 0 ? (
             <div className="py-16 text-center">
               <div className="w-16 h-16 bg-orange-100 rounded-full flex items-center justify-center mx-auto mb-4">
                 <svg className="w-8 h-8 text-orange-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">

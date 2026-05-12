@@ -23,6 +23,7 @@ export interface Causa {
   categoria: string
   activa: boolean
   fechaFin: string
+  diasRestantes?: number
 }
 
 export interface Donacion {
