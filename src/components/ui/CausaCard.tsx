@@ -14,10 +14,9 @@ const categoryConfig: Record<string, { bg: string; text: string }> = {
 }
 
 export default function CausaCard({ causa }: Props) {
-  const diasRestantes = Math.max(
-    0,
-    Math.ceil((new Date(causa.fechaFin).getTime() - Date.now()) / 86400000)
-  )
+  const diasRestantes =
+    causa.diasRestantes ??
+    Math.max(0, Math.ceil((new Date(causa.fechaFin).getTime() - Date.now()) / 86400000))
   const pct = Math.min(Math.round((causa.recaudado / causa.meta) * 100), 100)
   const cat = categoryConfig[causa.categoria] ?? { bg: 'bg-gray-100', text: 'text-gray-700' }
 

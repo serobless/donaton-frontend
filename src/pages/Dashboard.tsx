@@ -1,6 +1,16 @@
-import { useDonacion } from '../contexts/DonacionContext'
+import { useEffect, useState } from 'react'
 import { useAuth } from '../contexts/AuthContext'
 import ProgressBar from '../components/ui/ProgressBar'
+import type { Causa, Donacion, TopDonador } from '../types'
+import { mockCausas, mockDonaciones, mockTopDonadores } from '../lib/mockData'
+import api from '../lib/axios'
+
+interface DashboardResponse {
+  causas?: Causa[]
+  donaciones?: Donacion[]
+  topDonadores?: TopDonador[]
+  totalRecaudado?: number
+}
 
 function StatCard({ label, value, color }: { label: string; value: string; color: string }) {
   return (
@@ -13,17 +23,59 @@ function StatCard({ label, value, color }: { label: string; value: string; color
 
 export default function Dashboard() {
   const { user } = useAuth()
-  const { causas, donaciones, totalRecaudado, topDonadores } = useDonacion()
+  const [causas, setCausas] = useState<Causa[]>([])
+  const [donaciones, setDonaciones] = useState<Donacion[]>([])
+  const [topDonadores, setTopDonadores] = useState<TopDonador[]>([])
+  const [totalRecaudado, setTotalRecaudado] = useState(0)
+  const [isLoading, setIsLoading] = useState(true)
+
+  useEffect(() => {
+    async function fetchDashboard() {
+      try {
+        const { data } = await api.get<DashboardResponse>('/bff/dashboard')
+        const loadedCausas = data.causas ?? []
+        const loadedDonaciones = data.donaciones ?? []
+        setCausas(loadedCausas)
+        setDonaciones(loadedDonaciones)
+        setTopDonadores(data.topDonadores ?? [])
+        setTotalRecaudado(
+          data.totalRecaudado ?? loadedDonaciones.reduce((s, d) => s + d.monto, 0)
+        )
+      } catch (err: unknown) {
+        const hasResponse = err && typeof err === 'object' && 'response' in err
+        if (!hasResponse) {
+          setCausas(mockCausas)
+          setDonaciones(mockDonaciones)
+          setTopDonadores(mockTopDonadores)
+          setTotalRecaudado(mockDonaciones.reduce((s, d) => s + d.monto, 0))
+        }
+      } finally {
+        setIsLoading(false)
+      }
+    }
+    fetchDashboard()
+  }, [])
 
   const causasActivas = causas.filter((c) => c.activa)
   const totalMetas = causas.reduce((a, c) => a + c.meta, 0)
-  const pctGlobal = Math.round((totalRecaudado / totalMetas) * 100)
+  const pctGlobal = totalMetas > 0 ? Math.round((totalRecaudado / totalMetas) * 100) : 0
 
   const donacionesPorCausa = causas.map((c) => ({
     ...c,
     totalCausa: donaciones.filter((d) => d.causaId === c.id).reduce((a, d) => a + d.monto, 0),
     count: donaciones.filter((d) => d.causaId === c.id).length,
   }))
+
+  if (isLoading) {
+    return (
+      <div className="flex-1 bg-gray-50 flex items-center justify-center">
+        <div className="flex flex-col items-center gap-3 text-gray-400">
+          <span className="w-8 h-8 border-2 border-gray-200 border-t-orange-500 rounded-full animate-spin" />
+          <p className="text-sm">Cargando dashboard...</p>
+        </div>
+      </div>
+    )
+  }
 
   return (
     <div className="flex-1 bg-gray-50">

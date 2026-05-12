@@ -1,10 +1,37 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { useDonacion } from '../contexts/DonacionContext'
+import type { Donacion } from '../types'
+import { mockDonaciones } from '../lib/mockData'
+import api from '../lib/axios'
+
+interface TransparenciaResponse {
+  donaciones?: Donacion[]
+  totalRecaudado?: number
+  causas?: { id: number; titulo: string }[]
+}
 
 export default function Transparencia() {
-  const { donaciones, totalRecaudado, causas } = useDonacion()
+  const { causas } = useDonacion()
+  const [donaciones, setDonaciones] = useState<Donacion[]>([])
+  const [dataLoading, setDataLoading] = useState(true)
   const [filtroNombre, setFiltroNombre] = useState('')
   const [filtroCausa, setFiltroCausa] = useState('todas')
+
+  useEffect(() => {
+    async function fetchData() {
+      try {
+        const { data } = await api.get<TransparenciaResponse | Donacion[]>('/bff/transparencia')
+        const list = Array.isArray(data) ? data : (data.donaciones ?? [])
+        setDonaciones(list)
+      } catch (err: unknown) {
+        const hasResponse = err && typeof err === 'object' && 'response' in err
+        if (!hasResponse) setDonaciones(mockDonaciones)
+      } finally {
+        setDataLoading(false)
+      }
+    }
+    fetchData()
+  }, [])
 
   const donacionesFiltradas = donaciones.filter((d) => {
     const matchNombre =
@@ -14,8 +41,11 @@ export default function Transparencia() {
     return matchNombre && matchCausa
   })
 
+  const totalRecaudado = donaciones.reduce((acc, d) => acc + d.monto, 0)
   const totalDonadores = new Set(donaciones.map((d) => d.donadorEmail ?? d.donadorNombre)).size
   const promedio = donaciones.length > 0 ? Math.round(totalRecaudado / donaciones.length) : 0
+
+  const causasParaFiltro = causas.length > 0 ? causas : []
 
   return (
     <div className="flex-1 bg-gray-50">
@@ -36,26 +66,34 @@ export default function Transparencia() {
           </p>
 
           {/* Métricas */}
-          <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
-            {[
-              { label: 'Total recaudado', value: `$${totalRecaudado.toLocaleString('es-CL')}`, accent: true },
-              { label: 'Donaciones', value: donaciones.length, accent: false },
-              { label: 'Donadores únicos', value: totalDonadores, accent: false },
-              { label: 'Promedio por donación', value: `$${promedio.toLocaleString('es-CL')}`, accent: false },
-            ].map((m) => (
-              <div
-                key={m.label}
-                className={`rounded-xl p-4 ${m.accent ? 'bg-orange-500 text-white' : 'bg-gray-50 border border-gray-100'}`}
-              >
-                <p className={`text-xs font-medium mb-1 ${m.accent ? 'text-orange-100' : 'text-gray-500'}`}>
-                  {m.label}
-                </p>
-                <p className={`text-2xl font-extrabold ${m.accent ? 'text-white' : 'text-gray-900'}`}>
-                  {m.value}
-                </p>
-              </div>
-            ))}
-          </div>
+          {dataLoading ? (
+            <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
+              {[...Array(4)].map((_, i) => (
+                <div key={i} className="rounded-xl p-4 bg-gray-50 border border-gray-100 animate-pulse h-20" />
+              ))}
+            </div>
+          ) : (
+            <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
+              {[
+                { label: 'Total recaudado', value: `$${totalRecaudado.toLocaleString('es-CL')}`, accent: true },
+                { label: 'Donaciones', value: donaciones.length, accent: false },
+                { label: 'Donadores únicos', value: totalDonadores, accent: false },
+                { label: 'Promedio por donación', value: `$${promedio.toLocaleString('es-CL')}`, accent: false },
+              ].map((m) => (
+                <div
+                  key={m.label}
+                  className={`rounded-xl p-4 ${m.accent ? 'bg-orange-500 text-white' : 'bg-gray-50 border border-gray-100'}`}
+                >
+                  <p className={`text-xs font-medium mb-1 ${m.accent ? 'text-orange-100' : 'text-gray-500'}`}>
+                    {m.label}
+                  </p>
+                  <p className={`text-2xl font-extrabold ${m.accent ? 'text-white' : 'text-gray-900'}`}>
+                    {m.value}
+                  </p>
+                </div>
+              ))}
+            </div>
+          )}
         </div>
       </div>
 
@@ -76,7 +114,7 @@ export default function Transparencia() {
             className="border border-gray-200 rounded-xl px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-orange-400 bg-white"
           >
             <option value="todas">Todas las causas</option>
-            {causas.map((c) => (
+            {causasParaFiltro.map((c) => (
               <option key={c.id} value={String(c.id)}>
                 {c.titulo}
               </option>
@@ -101,7 +139,13 @@ export default function Transparencia() {
                 </tr>
               </thead>
               <tbody className="divide-y divide-gray-50">
-                {donacionesFiltradas.length === 0 ? (
+                {dataLoading ? (
+                  <tr>
+                    <td colSpan={5} className="px-6 py-12 text-center text-gray-400">
+                      Cargando donaciones...
+                    </td>
+                  </tr>
+                ) : donacionesFiltradas.length === 0 ? (
                   <tr>
                     <td colSpan={5} className="px-6 py-12 text-center text-gray-400">
                       No se encontraron donaciones con ese filtro.

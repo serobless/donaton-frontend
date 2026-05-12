@@ -1,38 +1,132 @@
-import { createContext, useContext, useState, type ReactNode } from 'react'
-import type { Causa, Donacion, TopDonador } from '../types'
+import { createContext, useContext, useEffect, useState, type ReactNode } from 'react'
+import type { Causa, TopDonador } from '../types'
 import { mockCausas, mockDonaciones, mockTopDonadores } from '../lib/mockData'
+import api from '../lib/axios'
+
+// Shape real del BFF /bff/portada
+interface BackendCausa {
+  id: number
+  nombre: string
+  meta: number
+  recaudado: number
+  activa: boolean
+  categoria: string
+  imagenUrl?: string
+  imagen?: string
+  diasRestantes?: number
+  descripcion?: string
+  fechaFin?: string
+}
+
+interface PortadaResponse {
+  causasActivas: BackendCausa[]
+  topDonadores: TopDonador[]
+  resumen?: {
+    totalRecaudado?: number
+    totalDonaciones?: number
+    causasActivas?: number
+  }
+  // compatibilidad por si el backend cambia a estas claves
+  causas?: BackendCausa[]
+  totalRecaudado?: number
+  totalDonaciones?: number
+}
+
+const CATEGORIA_MAP: Record<string, string> = {
+  ALIMENTACION:   'Alimentación',
+  EDUCACION:      'Educación',
+  SALUD:          'Salud',
+  ANIMALES:       'Animales',
+  VIVIENDA:       'Vivienda',
+  MEDIOAMBIENTE:  'Medioambiente',
+  EMERGENCIA:     'Emergencia',
+}
+
+function mapCausa(b: BackendCausa): Causa {
+  const diasRestantes = b.diasRestantes ?? 0
+  let fechaFin = b.fechaFin ?? ''
+  if (!fechaFin) {
+    const d = new Date()
+    d.setDate(d.getDate() + diasRestantes)
+    fechaFin = d.toISOString()
+  }
+  return {
+    id: b.id,
+    titulo: b.nombre,
+    descripcion: b.descripcion ?? '',
+    imagen: b.imagenUrl ?? b.imagen ?? '',
+    meta: b.meta,
+    recaudado: b.recaudado,
+    categoria: CATEGORIA_MAP[b.categoria] ?? b.categoria,
+    activa: b.activa,
+    fechaFin,
+    diasRestantes,
+  }
+}
 
 interface DonacionContextValue {
   causas: Causa[]
   causasActivas: Causa[]
-  donaciones: Donacion[]
   topDonadores: TopDonador[]
   totalRecaudado: number
-  addDonacion: (donacion: Omit<Donacion, 'id' | 'fecha'>) => void
+  totalDonaciones: number
+  isLoading: boolean
 }
 
 const DonacionContext = createContext<DonacionContextValue | null>(null)
 
 export function DonacionProvider({ children }: { children: ReactNode }) {
-  const [causas] = useState<Causa[]>(mockCausas)
-  const [donaciones, setDonaciones] = useState<Donacion[]>(mockDonaciones)
-  const [topDonadores] = useState<TopDonador[]>(mockTopDonadores)
+  const [causas, setCausas] = useState<Causa[]>([])
+  const [topDonadores, setTopDonadores] = useState<TopDonador[]>([])
+  const [totalRecaudado, setTotalRecaudado] = useState(0)
+  const [totalDonaciones, setTotalDonaciones] = useState(0)
+  const [isLoading, setIsLoading] = useState(true)
+
+  useEffect(() => {
+    async function fetchPortada() {
+      try {
+        const { data } = await api.get<PortadaResponse>('/bff/portada')
+
+        console.log('[DonacionContext] respuesta raw /bff/portada:', data)
+
+        // El BFF devuelve causasActivas (o causas como fallback de compatibilidad)
+        const rawCausas = data.causasActivas ?? data.causas ?? []
+        console.log('[DonacionContext] rawCausas antes de mapear:', rawCausas)
+        const mapped = rawCausas.map(mapCausa)
+        console.log('[DonacionContext] causas mapeadas:', mapped)
+        setCausas(mapped)
+        setTopDonadores(data.topDonadores ?? [])
+
+        const rec =
+          data.resumen?.totalRecaudado ??
+          data.totalRecaudado ??
+          mapped.reduce((s, c) => s + c.recaudado, 0)
+        const don =
+          data.resumen?.totalDonaciones ??
+          data.totalDonaciones ??
+          0
+        setTotalRecaudado(rec)
+        setTotalDonaciones(don)
+      } catch (err: unknown) {
+        const hasResponse = err && typeof err === 'object' && 'response' in err
+        if (!hasResponse) {
+          setCausas(mockCausas)
+          setTopDonadores(mockTopDonadores)
+          setTotalRecaudado(mockDonaciones.reduce((s, d) => s + d.monto, 0))
+          setTotalDonaciones(mockDonaciones.length)
+        }
+      } finally {
+        setIsLoading(false)
+      }
+    }
+    fetchPortada()
+  }, [])
 
   const causasActivas = causas.filter((c) => c.activa)
-  const totalRecaudado = donaciones.reduce((acc, d) => acc + d.monto, 0)
-
-  function addDonacion(data: Omit<Donacion, 'id' | 'fecha'>) {
-    const nueva: Donacion = {
-      ...data,
-      id: Date.now(),
-      fecha: new Date().toISOString(),
-    }
-    setDonaciones((prev) => [nueva, ...prev])
-  }
 
   return (
     <DonacionContext.Provider
-      value={{ causas, causasActivas, donaciones, topDonadores, totalRecaudado, addDonacion }}
+      value={{ causas, causasActivas, topDonadores, totalRecaudado, totalDonaciones, isLoading }}
     >
       {children}
     </DonacionContext.Provider>

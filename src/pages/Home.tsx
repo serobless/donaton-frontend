@@ -93,8 +93,11 @@ const HERO_IMGS = {
 }
 
 export default function Home() {
-  const { causasActivas, topDonadores, donaciones, totalRecaudado } = useDonacion()
+  const { causasActivas, topDonadores, totalDonaciones, totalRecaudado } = useDonacion()
   const causasHome = causasActivas.slice(0, 3)
+
+  console.log('[Home] causasActivas:', causasActivas)
+  console.log('[Home] causasHome (primeras 3):', causasHome)
 
   return (
     <main className="flex-1">
@@ -196,7 +199,7 @@ export default function Home() {
             />
             <div className="sm:pl-8 pt-8 sm:pt-0">
               <AnimatedStat
-                target={donaciones.length}
+                target={totalDonaciones}
                 label="Donaciones realizadas en total"
                 icon={
                   <svg className="w-5 h-5 text-orange-500" fill="currentColor" viewBox="0 0 24 24">
