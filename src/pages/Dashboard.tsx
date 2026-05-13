@@ -130,14 +130,11 @@ export default function Dashboard() {
         setDonaciones(loadedDonaciones)
         setTopDonadores(data.topDonadores ?? [])
         setTotalRecaudado(data.totalRecaudado ?? loadedDonaciones.reduce((s, d) => s + d.monto, 0))
-      } catch (err: unknown) {
-        const hasResponse = err && typeof err === 'object' && 'response' in err
-        if (!hasResponse) {
-          setCausas(mockCausas)
-          setDonaciones(mockDonaciones)
-          setTopDonadores(mockTopDonadores)
-          setTotalRecaudado(mockDonaciones.reduce((s, d) => s + d.monto, 0))
-        }
+      } catch {
+        setCausas(mockCausas)
+        setDonaciones(mockDonaciones)
+        setTopDonadores(mockTopDonadores)
+        setTotalRecaudado(mockDonaciones.reduce((s, d) => s + d.monto, 0))
       } finally {
         setIsLoading(false)
       }
