@@ -24,6 +24,41 @@ const TIPO_LABEL: Record<TipoDonacion, string> = {
   medica: '💊 Médica',
 }
 
+interface BackendDonacion {
+  id: number
+  monto: number
+  fecha: string
+  tipoDonacion: 'MONETARIA' | 'ROPA' | 'ALIMENTO' | 'MEDICA'
+  donanteAlias: string | null
+  causa: { id: number; nombre: string }
+  donadorId: string | null
+}
+
+function formatDate(fecha: unknown): string {
+  if (!fecha) return '—'
+  if (Array.isArray(fecha)) {
+    const [year, month, day] = fecha as number[]
+    const d = new Date(year, month - 1, day)
+    return isNaN(d.getTime()) ? '—' : d.toLocaleDateString('es-CL')
+  }
+  const d = new Date(fecha as string)
+  return isNaN(d.getTime()) ? '—' : d.toLocaleDateString('es-CL')
+}
+
+function mapBackendDonacion(b: BackendDonacion): DonacionExtendida {
+  return {
+    id: b.id,
+    donadorNombre: b.donanteAlias ?? 'Anónimo',
+    monto: b.monto,
+    causaId: b.causa.id,
+    causaTitulo: b.causa.nombre,
+    fecha: b.fecha,
+    anonima: b.donanteAlias === null,
+    estado: 'pendiente',
+    tipo: b.tipoDonacion.toLowerCase() as TipoDonacion,
+  }
+}
+
 function Modal({ title, onClose, children }: { title: string; onClose: () => void; children: React.ReactNode }) {
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4" onClick={onClose}>
@@ -60,7 +95,7 @@ function ConfirmModal({ message, confirmLabel, confirmColor, onConfirm, onCancel
 }
 
 export default function Donaciones() {
-  const { user } = useAuth()
+  const { user, token } = useAuth()
   const { causasActivas } = useDonacion()
   const [donaciones, setDonaciones] = useState<DonacionExtendida[]>([])
   const [historialLoading, setHistorialLoading] = useState(true)
@@ -82,28 +117,25 @@ export default function Donaciones() {
   const [editForm, setEditForm] = useState({ causaId: '', monto: '', mensaje: '', tipo: 'monetaria' as TipoDonacion })
 
   useEffect(() => {
+    if (!token) return
     async function fetchDonaciones() {
       try {
-        const { data } = await api.get<DonacionExtendida[]>('/api/donaciones')
-        setDonaciones(data)
-      } catch (err: unknown) {
-        const hasResponse = err && typeof err === 'object' && 'response' in err
-        if (!hasResponse) {
-          const fallback = user
-            ? mockDonaciones.filter(d => !d.anonima && (d.donadorEmail === user.email || d.donadorNombre === user.nombre))
-            : []
-          setDonaciones(fallback)
-        }
+        const { data } = await api.get<BackendDonacion[]>('/api/donaciones/mis-donaciones')
+        setDonaciones(data.map(mapBackendDonacion))
+      } catch {
+        const fallback = user
+          ? mockDonaciones.filter(d => !d.anonima && (d.donadorEmail === user.email || d.donadorNombre === user.nombre))
+          : []
+        setDonaciones(fallback)
       } finally {
         setHistorialLoading(false)
       }
     }
     fetchDonaciones()
-  }, [user])
+  }, [token])
 
-  const misDonaciones = donaciones.filter(
-    d => !d.anonima && (d.donadorEmail === user?.email || d.donadorNombre === user?.nombre)
-  )
+  // /api/donaciones/mis-donaciones ya filtra por donadorId en el backend
+  const misDonaciones = donaciones.filter(d => !d.anonima)
 
   const donacionesFiltradas = misDonaciones.filter(d => {
     const matchEstado = filtroEstado === 'todos' || d.estado === filtroEstado
@@ -123,32 +155,32 @@ export default function Donaciones() {
     const causa = causasActivas.find(c => c.id === Number(form.causaId))
     if (!causa) { setLoading(false); return }
 
-    const payload = { causaId: causa.id, monto: Number(form.monto), mensaje: form.mensaje, anonima: form.anonima }
+    const payload = {
+      causaId: causa.id,
+      tipoDonacion: form.tipo.toUpperCase(),
+      monto: Number(form.monto),
+      donanteAlias: form.anonima ? null : user.nombre,
+    }
 
     try {
-      const { data: nueva } = await api.post<DonacionExtendida>('/api/donaciones', payload)
-      setDonaciones(prev => [nueva, ...prev])
-    } catch (err: unknown) {
-      const hasResponse = err && typeof err === 'object' && 'response' in err
-      if (!hasResponse) {
-        const nueva: DonacionExtendida = {
-          id: Date.now(),
-          donadorNombre: form.anonima ? 'Anónimo' : user.nombre,
-          donadorEmail: form.anonima ? undefined : user.email,
-          monto: Number(form.monto),
-          causaId: causa.id,
-          causaTitulo: causa.titulo,
-          fecha: new Date().toISOString(),
-          mensaje: form.mensaje,
-          anonima: form.anonima,
-          estado: 'pendiente',
-          tipo: form.tipo,
-        }
-        setDonaciones(prev => [nueva, ...prev])
-      } else {
-        setLoading(false)
-        return
+      await api.post<DonacionExtendida>('/api/donaciones', payload)
+      const { data: lista } = await api.get<BackendDonacion[]>('/api/donaciones/mis-donaciones')
+      setDonaciones(lista.map(mapBackendDonacion))
+    } catch {
+      const nueva: DonacionExtendida = {
+        id: Date.now(),
+        donadorNombre: form.anonima ? 'Anónimo' : user.nombre,
+        donadorEmail: form.anonima ? undefined : user.email,
+        monto: Number(form.monto),
+        causaId: causa.id,
+        causaTitulo: causa.titulo,
+        fecha: new Date().toISOString(),
+        mensaje: form.mensaje,
+        anonima: form.anonima,
+        estado: 'pendiente',
+        tipo: form.tipo,
       }
+      setDonaciones(prev => [nueva, ...prev])
     }
 
     setLoading(false)
@@ -328,7 +360,7 @@ export default function Donaciones() {
                       </div>
                       {d.mensaje && <p className="text-xs text-gray-500 mt-0.5 italic">"{d.mensaje}"</p>}
                       <p className="text-xs text-gray-400 mt-1">
-                        {new Date(d.fecha).toLocaleDateString('es-CL', { day: '2-digit', month: 'long', year: 'numeric' })}
+                        {formatDate(d.fecha)}
                         {d.destino && ` · ${d.destino}`}
                       </p>
                     </div>
@@ -371,7 +403,7 @@ export default function Donaciones() {
               <div><p className="text-xs text-gray-400 mb-1">Monto</p><p className="font-bold text-orange-500 text-xl">${donacionDetalle.monto.toLocaleString('es-CL')}</p></div>
               <div><p className="text-xs text-gray-400 mb-1">Estado</p><span className={`text-xs px-2 py-1 rounded-full font-medium ${ESTADO_COLOR[donacionDetalle.estado]}`}>{ESTADO_LABEL[donacionDetalle.estado]}</span></div>
               <div><p className="text-xs text-gray-400 mb-1">Tipo</p><p className="font-medium">{TIPO_LABEL[donacionDetalle.tipo]}</p></div>
-              <div><p className="text-xs text-gray-400 mb-1">Fecha</p><p className="font-medium">{new Date(donacionDetalle.fecha).toLocaleDateString('es-CL', { dateStyle: 'long' })}</p></div>
+              <div><p className="text-xs text-gray-400 mb-1">Fecha</p><p className="font-medium">{formatDate(donacionDetalle.fecha)}</p></div>
               {donacionDetalle.destino && <div><p className="text-xs text-gray-400 mb-1">Destino</p><p className="font-medium">{donacionDetalle.destino}</p></div>}
               {donacionDetalle.mensaje && <div className="col-span-2"><p className="text-xs text-gray-400 mb-1">Mensaje</p><p className="italic text-gray-600">"{donacionDetalle.mensaje}"</p></div>}
             </div>

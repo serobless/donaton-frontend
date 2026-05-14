@@ -41,7 +41,7 @@ export default function Navbar() {
             {isAuthenticated && (
               <NavLink to="/donaciones" className={linkClass}>Mis donaciones</NavLink>
             )}
-            {user?.rol === 'admin' && (
+            {user?.rol?.toLowerCase() === 'admin' && (
               <NavLink to="/dashboard" className={linkClass}>Dashboard</NavLink>
             )}
           </nav>
@@ -107,7 +107,7 @@ export default function Navbar() {
             { to: '/', label: 'Inicio', end: true },
             { to: '/transparencia', label: 'Transparencia' },
             ...(isAuthenticated ? [{ to: '/donaciones', label: 'Mis donaciones' }] : []),
-            ...(user?.rol === 'admin' ? [{ to: '/dashboard', label: 'Dashboard' }] : []),
+            ...(user?.rol?.toLowerCase() === 'admin' ? [{ to: '/dashboard', label: 'Dashboard' }] : []),
           ].map((item) => (
             <NavLink
               key={item.to}

@@ -34,7 +34,7 @@ function AnimatedStat({ target, prefix = '', suffix = '', label, icon }: {
 
 /* ─── Floating hero image ─── */
 function HeroImg({ src, size, className }: { src: string; size: 'sm' | 'md' | 'lg'; className?: string }) {
-  const dim = size === 'lg' ? 'w-28 h-28' : size === 'md' ? 'w-20 h-20' : 'w-14 h-14'
+  const dim = 'w-52 h-52'
   return (
     <div className={`absolute ${dim} rounded-full overflow-hidden ring-4 ring-white shadow-xl ${className ?? ''}`}>
       <img src={src} alt="" className="w-full h-full object-cover" />
@@ -70,6 +70,16 @@ const DONADOR_FOTOS = [
   'https://images.unsplash.com/photo-1500648767791-00dcc994a43e?w=100',
 ]
 
+const ORG_KEYWORDS = ['empresa', 'club', 'farmacia', 'fundacion', 'fundación', 'corp', 'ltda', 'spa', 'srl', 'asociacion', 'asociación', 'colegio', 'instituto', 'laboratorio']
+const ANON_KEYWORDS = ['anonimo', 'anónimo', 'anonymous']
+
+function getAvatarType(nombre: string): 'org' | 'anon' | 'person' {
+  const lower = (nombre ?? '').toLowerCase()
+  if (ANON_KEYWORDS.some(k => lower.includes(k))) return 'anon'
+  if (ORG_KEYWORDS.some(k => lower.includes(k))) return 'org'
+  return 'person'
+}
+
 /* Logos de partners por ID (null = sin logo, usar badge) */
 const PARTNER_LOGOS: Record<number, string | null> = {
   1: 'https://upload.wikimedia.org/wikipedia/commons/thumb/a/a9/Falabella_logo.svg/200px-Falabella_logo.svg.png',
@@ -83,6 +93,12 @@ const PARTNER_LOGOS: Record<number, string | null> = {
 export default function Home() {
   const { causasActivas, topDonadores, totalDonaciones, totalRecaudado } = useDonacion()
   const causasHome = causasActivas.slice(0, 3)
+
+  let _personPhotoIdx = 0
+  const donadorAvatarData = topDonadores.map(d => {
+    const type = getAvatarType(d.nombre ?? '')
+    return { type, photoIdx: type === 'person' ? _personPhotoIdx++ : -1 }
+  })
 
   // Donación especial — form
   const [formEspecial, setFormEspecial] = useState({ nombre: '', tipoBien: '', descripcion: '', region: '', telefono: '' })
@@ -140,8 +156,8 @@ export default function Home() {
         <HeroImg src={HERO_IMGS.a} size="lg" className="hidden xl:block top-16 left-[4%]" />
         <HeroImg src={HERO_IMGS.b} size="md" className="hidden xl:block top-52 left-[11%]" />
         <HeroImg src={HERO_IMGS.c} size="sm" className="hidden xl:block top-[68%] left-[6%]" />
-        <HeroImg src={HERO_IMGS.d} size="md" className="hidden xl:block top-14 right-[6%]" />
-        <HeroImg src={HERO_IMGS.e} size="lg" className="hidden xl:block top-44 right-[3%]" />
+        <HeroImg src={HERO_IMGS.d} size="lg" className="hidden xl:block top-14 right-[6%]" />
+        <HeroImg src={HERO_IMGS.e} size="md" className="hidden xl:block top-44 right-[3%]" />
         <HeroImg src={HERO_IMGS.f} size="sm" className="hidden xl:block top-[65%] right-[10%]" />
         <div className="relative max-w-6xl mx-auto px-6 w-full text-center z-10">
           <span className="inline-flex items-center gap-2 bg-orange-50 border border-orange-100 text-orange-600 text-xs font-semibold px-4 py-1.5 rounded-full mb-8 tracking-wide">
@@ -163,8 +179,17 @@ export default function Home() {
           </div>
           <div className="flex items-center justify-center gap-3 mt-10">
             <div className="flex -space-x-2.5">
-              {['V', 'C', 'M', 'A', 'R'].map(l => (
-                <div key={l} className="w-9 h-9 rounded-full bg-orange-400 ring-2 ring-white flex items-center justify-center text-white text-xs font-bold">{l}</div>
+              {[
+                { inicial: 'V', url: 'https://images.unsplash.com/photo-1494790108377-be9c29b29330?w=60' },
+                { inicial: 'C', url: 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=60' },
+                { inicial: 'M', url: 'https://images.unsplash.com/photo-1438761681033-6461ffad8d80?w=60' },
+                { inicial: 'A', url: 'https://images.unsplash.com/photo-1544005313-94ddf0286df2?w=60' },
+                { inicial: 'R', url: 'https://images.unsplash.com/photo-1500648767791-00dcc994a43e?w=60' },
+              ].map(({ inicial, url }) => (
+                <div key={inicial} className="w-9 h-9 rounded-full bg-orange-400 ring-2 ring-white overflow-hidden relative flex items-center justify-center text-white text-xs font-bold">
+                  <span className="absolute inset-0 flex items-center justify-center">{inicial}</span>
+                  <img src={url} alt={inicial} className="absolute inset-0 w-full h-full object-cover" onError={e => { (e.currentTarget as HTMLImageElement).style.display = 'none' }} />
+                </div>
               ))}
             </div>
             <p className="text-sm text-gray-500"><strong className="text-gray-900">+{topDonadores.length} donadores</strong> ya están ayudando</p>
@@ -232,7 +257,7 @@ export default function Home() {
       <section id="campana-invierno" className="relative py-24 overflow-hidden">
         {/* Fondo oscuro con overlay */}
         <div className="absolute inset-0 bg-gray-900" />
-        <div className="absolute inset-0 opacity-20" style={{ backgroundImage: "url('https://images.unsplash.com/photo-1551698618-1dfe5d97d256?w=1600&auto=format')", backgroundSize: 'cover', backgroundPosition: 'center' }} />
+        <div className="absolute inset-0 opacity-20" style={{ backgroundImage: "url('https://images.unsplash.com/photo-1488521787991-ed7bbaae773c?w=1400')", backgroundSize: 'cover', backgroundPosition: 'center' }} />
         <div className="relative max-w-6xl mx-auto px-6 z-10">
           {/* Badge */}
           <span className="inline-flex items-center gap-2 bg-orange-500/20 border border-orange-400/30 text-orange-300 text-xs font-semibold px-4 py-1.5 rounded-full mb-6 tracking-wide">
@@ -489,14 +514,15 @@ export default function Home() {
       {/* ══════════════════════════════════════
           VOLUNTARIADO
       ══════════════════════════════════════ */}
-      <section id="voluntariado" className="relative py-20 bg-orange-500 overflow-hidden">
-        {/* Imagen de fondo con voluntarios */}
-        <div
-          className="absolute inset-0 bg-cover bg-center opacity-20"
-          style={{ backgroundImage: "url('https://images.unsplash.com/photo-1593113630400-ea4288922559?w=1200')" }}
+      <section id="voluntariado" className="relative overflow-hidden py-20">
+        {/* Imagen de fondo */}
+        <img
+          src="https://images.unsplash.com/photo-1509099836639-18ba1795216d?w=1400"
+          alt=""
+          className="absolute inset-0 w-full h-full object-cover"
         />
-        {/* Overlay naranja para mantener el color */}
-        <div className="absolute inset-0 bg-orange-500/80" />
+        {/* Overlay naranja semitransparente */}
+        <div className="absolute inset-0 bg-orange-600/30" />
         <div className="relative z-10 max-w-6xl mx-auto px-6">
           <div className="text-center mb-12">
             <p className="text-orange-200 font-semibold text-base mb-2 italic" style={{ fontFamily: "'Playfair Display', Georgia, serif" }}>Únete a nosotros</p>
@@ -601,8 +627,13 @@ export default function Home() {
       {/* ══════════════════════════════════════
           IMPACTO POR REGIÓN
       ══════════════════════════════════════ */}
-      <section className="py-20 bg-white">
-        <div className="max-w-6xl mx-auto px-6">
+      <section className="relative py-20 bg-white overflow-hidden">
+        <img
+          src="https://images.unsplash.com/photo-1593113630400-ea4288922559?w=1400"
+          alt=""
+          className="absolute inset-0 w-full h-full object-cover opacity-10"
+        />
+        <div className="relative z-10 max-w-6xl mx-auto px-6">
           <div className="text-center mb-12">
             <p className="text-orange-500 font-semibold text-base mb-2 italic" style={{ fontFamily: "'Playfair Display', Georgia, serif" }}>Impacto nacional</p>
             <h2 className="text-4xl sm:text-5xl font-black text-gray-900 mb-4" style={{ fontFamily: "'Playfair Display', Georgia, serif" }}>
@@ -610,46 +641,30 @@ export default function Home() {
             </h2>
           </div>
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-10 items-center">
-            {/* Mapa SVG simplificado de Chile */}
+            {/* Mapa de Chile con fotos por región */}
             <div className="flex justify-center">
-              <div className="relative w-48 sm:w-56">
-                <svg viewBox="0 0 120 600" className="w-full" xmlns="http://www.w3.org/2000/svg">
-                  {/* Representación simplificada de Chile (columna vertical) */}
-                  {[
-                    { y: 20, h: 40, label: 'IV', nivel: 1 },
-                    { y: 68, h: 35, label: 'V', nivel: 3 },
-                    { y: 111, h: 30, label: 'RM', nivel: 5 },
-                    { y: 149, h: 35, label: 'VI', nivel: 1 },
-                    { y: 192, h: 38, label: 'VII', nivel: 2 },
-                    { y: 238, h: 42, label: 'VIII', nivel: 3 },
-                    { y: 288, h: 38, label: 'IX', nivel: 2 },
-                    { y: 334, h: 40, label: 'XIV', nivel: 1 },
-                    { y: 382, h: 45, label: 'X', nivel: 1 },
-                    { y: 435, h: 80, label: 'XI', nivel: 1 },
-                    { y: 523, h: 60, label: 'XII', nivel: 1 },
-                  ].map(r => {
-                    const colors = ['#FED7AA', '#FED7AA', '#FB923C', '#F97316', '#EA580C']
-                    return (
-                      <g key={r.label}>
-                        <rect x="15" y={r.y} width="90" height={r.h} rx="4" fill={colors[r.nivel - 1]} stroke="white" strokeWidth="2" />
-                        <text x="60" y={r.y + r.h / 2 + 4} textAnchor="middle" fontSize="10" fontWeight="bold" fill="white">{r.label}</text>
-                      </g>
-                    )
-                  })}
-                </svg>
-                {/* Leyenda */}
-                <div className="absolute -right-24 top-1/2 -translate-y-1/2 space-y-1.5">
-                  {[
-                    { color: 'bg-orange-100', label: 'Bajo' },
-                    { color: 'bg-orange-300', label: 'Medio' },
-                    { color: 'bg-orange-500', label: 'Alto' },
-                  ].map(l => (
-                    <div key={l.label} className="flex items-center gap-1.5 text-xs text-gray-500 whitespace-nowrap">
-                      <div className={`w-3 h-3 rounded-sm ${l.color}`} />
-                      {l.label}
+              <div className="flex flex-col gap-1 w-48 sm:w-56">
+                {[
+                  { label: 'IV',   h: 'h-10', foto: 'https://images.unsplash.com/photo-1509316785289-025f5b846b35?w=400&q=80' },
+                  { label: 'V',    h: 'h-9',  foto: 'https://images.unsplash.com/photo-1565008447742-97f6f38c985c?w=400&q=80' },
+                  { label: 'RM',   h: 'h-8',  foto: 'https://images.unsplash.com/photo-1588392382834-a891154bca4d?w=400&q=80' },
+                  { label: 'VI',   h: 'h-9',  foto: 'https://images.unsplash.com/photo-1500534314209-a25ddb2bd429?w=400&q=80' },
+                  { label: 'VII',  h: 'h-10', foto: 'https://images.unsplash.com/photo-1500534314209-a25ddb2bd429?w=400&q=80' },
+                  { label: 'VIII', h: 'h-11', foto: 'https://images.unsplash.com/photo-1501854140801-50d01698950b?w=400&q=80' },
+                  { label: 'IX',   h: 'h-10', foto: 'https://images.unsplash.com/photo-1506905925346-21bda4d32df4?w=400&q=80' },
+                  { label: 'XIV',  h: 'h-10', foto: 'https://images.unsplash.com/photo-1501854140801-50d01698950b?w=400&q=80' },
+                  { label: 'X',    h: 'h-11', foto: 'https://images.unsplash.com/photo-1501854140801-50d01698950b?w=400&q=80' },
+                  { label: 'XI',   h: 'h-20', foto: 'https://images.unsplash.com/photo-1501854140801-50d01698950b?w=400&q=80' },
+                  { label: 'XII',  h: 'h-16', foto: 'https://images.unsplash.com/photo-1506905925346-21bda4d32df4?w=400&q=80' },
+                ].map(r => (
+                  <div key={r.label} className={`relative overflow-hidden rounded-lg ${r.h}`}>
+                    {r.foto && <img src={r.foto} alt={r.label} className="absolute inset-0 w-full h-full object-cover" onError={e => { e.currentTarget.style.display = 'none' }} />}
+                    <div className={`absolute inset-0 ${r.foto ? 'bg-orange-500/60' : 'bg-orange-300'}`} />
+                    <div className="relative z-10 flex items-center justify-center h-full">
+                      <span className="text-white font-bold text-xl">{r.label}</span>
                     </div>
-                  ))}
-                </div>
+                  </div>
+                ))}
               </div>
             </div>
 
@@ -703,26 +718,45 @@ export default function Home() {
             {topDonadores.map((d, i) => {
               const medal = MEDALS[i] ?? MEDALS[4]
               const isTop3 = i < 3
+              const { type: avatarType, photoIdx } = donadorAvatarData[i] ?? { type: 'person', photoIdx: -1 }
               return (
-                <div key={d.id} className={`flex flex-col items-center text-center gap-3 p-5 rounded-2xl transition-colors duration-150 ${isTop3 ? 'bg-gray-800 border border-gray-700 hover:border-orange-500/40' : 'bg-gray-800/50 border border-gray-800 hover:border-gray-700'}`}>
+                <div key={d.id ?? i} className={`flex flex-col items-center text-center gap-3 p-5 rounded-2xl transition-colors duration-150 ${isTop3 ? 'bg-gray-800 border border-gray-700 hover:border-orange-500/40' : 'bg-gray-800/50 border border-gray-800 hover:border-gray-700'}`}>
                   <span className="text-xl leading-none">{isTop3 ? medal.label : ''}</span>
-                  <div className={`w-16 h-16 rounded-full ring-4 ${medal.ring} ring-offset-2 ring-offset-gray-800 overflow-hidden flex-shrink-0 bg-orange-100 relative`}>
-                    {/* Inicial como fallback — queda debajo de la foto */}
-                    <span className="absolute inset-0 flex items-center justify-center text-orange-600 font-black text-2xl leading-none">{d.nombre[0]}</span>
-                    <img
-                      src={DONADOR_FOTOS[i]}
-                      alt={d.nombre}
-                      className="absolute inset-0 w-full h-full object-cover"
-                      onError={e => { (e.currentTarget as HTMLImageElement).style.display = 'none' }}
-                    />
+                  <div className={`w-16 h-16 rounded-full ring-4 ${medal.ring} ring-offset-2 ring-offset-gray-800 overflow-hidden flex-shrink-0 relative`}>
+                    {avatarType === 'anon' && (
+                      <div className="absolute inset-0 flex items-center justify-center bg-gray-700">
+                        <svg className="w-8 h-8 text-gray-400" fill="currentColor" viewBox="0 0 24 24">
+                          <path d="M12 12c2.7 0 4.8-2.1 4.8-4.8S14.7 2.4 12 2.4 7.2 4.5 7.2 7.2 9.3 12 12 12zm0 2.4c-3.2 0-9.6 1.6-9.6 4.8v2.4h19.2v-2.4c0-3.2-6.4-4.8-9.6-4.8z" />
+                        </svg>
+                      </div>
+                    )}
+                    {avatarType === 'org' && (
+                      <div className="absolute inset-0 flex items-center justify-center bg-indigo-100">
+                        <span className="text-indigo-600 font-black text-2xl leading-none">{(d.nombre ?? '?')[0].toUpperCase()}</span>
+                      </div>
+                    )}
+                    {avatarType === 'person' && (
+                      <>
+                        <div className="absolute inset-0 flex items-center justify-center bg-orange-100">
+                          <span className="text-orange-600 font-black text-2xl leading-none">{(d.nombre ?? '?')[0].toUpperCase()}</span>
+                        </div>
+                        {DONADOR_FOTOS[photoIdx] && (
+                          <img
+                            src={DONADOR_FOTOS[photoIdx]}
+                            alt={d.nombre ?? ''}
+                            className="absolute inset-0 w-full h-full object-cover"
+                            onError={e => { (e.currentTarget as HTMLImageElement).style.display = 'none' }}
+                          />
+                        )}
+                      </>
+                    )}
                   </div>
                   {!isTop3 && <span className="text-gray-500 text-xs font-bold">#{i + 1}</span>}
                   <p className="text-white font-bold text-sm leading-tight">
-                    {d.nombre.split(' ')[0]}<br />
-                    <span className="font-normal text-gray-400">{d.nombre.split(' ').slice(1).join(' ')}</span>
+                    {(d.nombre ?? '').split(' ')[0]}<br />
+                    <span className="font-normal text-gray-400">{(d.nombre ?? '').split(' ').slice(1).join(' ')}</span>
                   </p>
-                  <p className="text-orange-400 font-extrabold text-base">${d.totalDonado.toLocaleString('es-CL')}</p>
-                  <span className="text-gray-600 text-xs">{d.cantidadDonaciones} donaciones</span>
+                  <p className="text-orange-400 font-extrabold text-base">${(d.totalDonado ?? 0).toLocaleString('es-CL')}</p>
                 </div>
               )
             })}

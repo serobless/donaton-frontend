@@ -14,7 +14,7 @@ export default function ProtectedRoute({ requiredRole }: Props) {
     return <Navigate to="/login" replace />
   }
 
-  if (requiredRole && user?.rol !== requiredRole) {
+  if (requiredRole && user?.rol?.toLowerCase() !== requiredRole) {
     return <Navigate to="/" replace />
   }
 

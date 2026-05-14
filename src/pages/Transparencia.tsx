@@ -4,10 +4,45 @@ import type { DonacionExtendida, EvidenciaCampana } from '../types'
 import { mockDonaciones, mockEvidencias } from '../lib/mockData'
 import api from '../lib/axios'
 
+interface BffDonacion {
+  id: number
+  donadorNombre: string | null
+  causaNombre: string | null
+  monto: number
+  fecha: string
+  tipoDonacion?: string
+  estado?: string
+}
+
 interface TransparenciaResponse {
-  donaciones?: DonacionExtendida[]
-  totalRecaudado?: number
-  causas?: { id: number; titulo: string }[]
+  donaciones?: BffDonacion[]
+  totalRegistros?: number
+  mensajeError?: string | null
+}
+
+function formatDate(fecha: unknown): string {
+  if (!fecha) return '—'
+  if (Array.isArray(fecha)) {
+    const [year, month, day] = fecha as number[]
+    const d = new Date(year, month - 1, day)
+    return isNaN(d.getTime()) ? '—' : d.toLocaleDateString('es-CL')
+  }
+  const d = new Date(fecha as string)
+  return isNaN(d.getTime()) ? '—' : d.toLocaleDateString('es-CL')
+}
+
+function mapBffDonacion(b: BffDonacion): DonacionExtendida {
+  return {
+    id: b.id,
+    donadorNombre: b.donadorNombre ?? 'Anónimo',
+    monto: b.monto,
+    causaId: 0,
+    causaTitulo: b.causaNombre ?? '',
+    fecha: b.fecha,
+    anonima: b.donadorNombre === null,
+    estado: (b.estado as DonacionExtendida['estado']) ?? 'completada',
+    tipo: (b.tipoDonacion?.toLowerCase() as DonacionExtendida['tipo']) ?? 'monetaria',
+  }
 }
 
 function Modal({ title, onClose, children }: { title: string; onClose: () => void; children: React.ReactNode }) {
@@ -78,12 +113,11 @@ export default function Transparencia() {
   useEffect(() => {
     async function fetchData() {
       try {
-        const { data } = await api.get<TransparenciaResponse | DonacionExtendida[]>('/bff/transparencia')
-        const list = Array.isArray(data) ? data : (data.donaciones ?? [])
-        setDonaciones(list as DonacionExtendida[])
-      } catch (err: unknown) {
-        const hasResponse = err && typeof err === 'object' && 'response' in err
-        if (!hasResponse) setDonaciones(mockDonaciones)
+        const { data } = await api.get<TransparenciaResponse | BffDonacion[]>('/bff/transparencia')
+        const rawList: BffDonacion[] = Array.isArray(data) ? data : (data.donaciones ?? [])
+        setDonaciones(rawList.map(mapBffDonacion))
+      } catch {
+        setDonaciones(mockDonaciones)
       } finally {
         setDataLoading(false)
       }
@@ -93,7 +127,7 @@ export default function Transparencia() {
 
   const donacionesFiltradas = donaciones.filter(d => {
     const matchNombre = filtroNombre === '' || d.donadorNombre.toLowerCase().includes(filtroNombre.toLowerCase())
-    const matchCausa = filtroCausa === 'todas' || String(d.causaId) === filtroCausa
+    const matchCausa = filtroCausa === 'todas' || d.causaTitulo === filtroCausa
     const matchEstado = filtroEstado === 'todos' || (d.estado ?? 'completada') === filtroEstado
     return matchNombre && matchCausa && matchEstado
   })
@@ -189,7 +223,7 @@ export default function Transparencia() {
               />
               <select value={filtroCausa} onChange={e => setFiltroCausa(e.target.value)} className="border border-gray-200 rounded-xl px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-orange-400 bg-white">
                 <option value="todas">Todas las causas</option>
-                {causasParaFiltro.map(c => <option key={c.id} value={String(c.id)}>{c.titulo}</option>)}
+                {causasParaFiltro.map(c => <option key={c.id} value={c.titulo}>{c.titulo}</option>)}
               </select>
               <select value={filtroEstado} onChange={e => setFiltroEstado(e.target.value)} className="border border-gray-200 rounded-xl px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-orange-400 bg-white">
                 <option value="todos">Todos los estados</option>
@@ -236,7 +270,7 @@ export default function Transparencia() {
                           <td className="px-6 py-4">
                             <div className="flex items-center gap-2.5">
                               <div className="w-8 h-8 rounded-full bg-orange-100 flex items-center justify-center text-orange-600 font-bold text-xs flex-shrink-0">
-                                {d.anonima ? '?' : d.donadorNombre[0]}
+                                {d.anonima || !d.donadorNombre ? '?' : d.donadorNombre[0]}
                               </div>
                               <span className="font-medium text-gray-900">{d.anonima ? 'Anónimo' : d.donadorNombre}</span>
                             </div>
@@ -253,7 +287,7 @@ export default function Transparencia() {
                           </td>
                           <td className="px-6 py-4 text-gray-500 italic max-w-xs"><span className="truncate block">{d.mensaje || '—'}</span></td>
                           <td className="px-6 py-4 text-gray-400 whitespace-nowrap">
-                            {new Date(d.fecha).toLocaleDateString('es-CL', { day: '2-digit', month: 'short', year: 'numeric' })}
+                            {formatDate(d.fecha)}
                           </td>
                         </tr>
                       ))

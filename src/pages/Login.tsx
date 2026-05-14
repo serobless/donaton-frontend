@@ -175,7 +175,7 @@ export default function Login() {
             <div className="mt-6 p-4 bg-blue-50 rounded-xl border border-blue-100 text-xs text-blue-700">
               <p className="font-semibold mb-1">Cuentas de demo:</p>
               <p>Admin: <strong>admin@donaton.cl</strong> / 123456</p>
-              <p>Donador: <strong>maria@email.com</strong> / 123456</p>
+              <p>Donador: <strong>juan@donaton.cl</strong> / 123456</p>
             </div>
           )}
         </div>

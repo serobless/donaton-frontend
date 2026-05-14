@@ -107,14 +107,11 @@ export function DonacionProvider({ children }: { children: ReactNode }) {
           0
         setTotalRecaudado(rec)
         setTotalDonaciones(don)
-      } catch (err: unknown) {
-        const hasResponse = err && typeof err === 'object' && 'response' in err
-        if (!hasResponse) {
-          setCausas(mockCausas)
-          setTopDonadores(mockTopDonadores)
-          setTotalRecaudado(mockDonaciones.reduce((s, d) => s + d.monto, 0))
-          setTotalDonaciones(mockDonaciones.length)
-        }
+      } catch {
+        setCausas(mockCausas)
+        setTopDonadores(mockTopDonadores)
+        setTotalRecaudado(mockDonaciones.reduce((s, d) => s + d.monto, 0))
+        setTotalDonaciones(mockDonaciones.length)
       } finally {
         setIsLoading(false)
       }

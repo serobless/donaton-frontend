@@ -24,12 +24,15 @@ export default function CausaCard({ causa }: Props) {
     <article className="group bg-white rounded-2xl overflow-hidden shadow-sm hover:shadow-lg transition-all duration-300 border border-gray-100 hover:-translate-y-1 flex flex-col">
 
       {/* ── Image ── */}
-      <div className="relative h-52 overflow-hidden flex-shrink-0">
-        <img
-          src={causa.imagen}
-          alt={causa.titulo}
-          className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-700 ease-out"
-        />
+      <div className={`relative h-52 overflow-hidden flex-shrink-0 ${cat.bg}`}>
+        {causa.imagen && (
+          <img
+            src={causa.imagen}
+            alt={causa.titulo}
+            className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-700 ease-out"
+            onError={e => { (e.currentTarget as HTMLImageElement).style.display = 'none' }}
+          />
+        )}
 
         {/* Category badge — solid on image */}
         <span className={`absolute top-3 left-3 ${cat.bg} ${cat.text} text-xs font-bold px-2.5 py-1 rounded-full`}>

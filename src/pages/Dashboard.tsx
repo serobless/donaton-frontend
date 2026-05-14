@@ -16,11 +16,90 @@ import {
   PieChart, Pie, Cell, Legend,
 } from 'recharts'
 
+// Shapes reales del BFF /bff/dashboard
+interface BffDonacion {
+  id: number
+  donadorNombre: string | null
+  causaNombre: string | null
+  monto: number
+  fecha: string
+  estado: string | null
+}
+
+interface BffTopDonador {
+  nombre: string
+  totalDonado: number
+  cantidadDonaciones?: number
+}
+
+interface BffCausa {
+  id: number
+  nombre: string
+  descripcion?: string
+  meta: number
+  recaudado: number
+  activa: boolean
+  categoria: string
+  imagenUrl?: string
+  diasRestantes?: number
+}
+
 interface DashboardResponse {
-  causas?: Causa[]
-  donaciones?: DonacionExtendida[]
-  topDonadores?: TopDonador[]
-  totalRecaudado?: number
+  totalDonado?: number
+  totalDonaciones?: number
+  causasActivas?: number
+  topDonadores?: BffTopDonador[]
+  ultimasDonaciones?: BffDonacion[]
+  mensajeError?: string
+}
+
+function mapBffDonacion(b: BffDonacion): DonacionExtendida {
+  return {
+    id: b.id,
+    donadorNombre: b.donadorNombre ?? 'Anónimo',
+    monto: b.monto,
+    causaId: 0,
+    causaTitulo: b.causaNombre ?? '',
+    fecha: b.fecha,
+    anonima: b.donadorNombre === null,
+    estado: (b.estado ?? 'pendiente') as EstadoDonacion,
+    tipo: 'monetaria',
+  }
+}
+
+function mapBffTopDonador(b: BffTopDonador, index: number): TopDonador {
+  return {
+    id: index,
+    nombre: b.nombre,
+    totalDonado: b.totalDonado,
+    cantidadDonaciones: b.cantidadDonaciones ?? 0,
+  }
+}
+
+function mapBffCausa(c: BffCausa): Causa {
+  return {
+    id: c.id,
+    titulo: c.nombre,
+    descripcion: c.descripcion ?? '',
+    imagen: c.imagenUrl ?? '',
+    meta: c.meta,
+    recaudado: c.recaudado,
+    categoria: c.categoria,
+    activa: c.activa,
+    fechaFin: '',
+    diasRestantes: c.diasRestantes,
+  }
+}
+
+function formatDate(fecha: unknown): string {
+  if (!fecha) return '—'
+  if (Array.isArray(fecha)) {
+    const [year, month, day] = fecha as number[]
+    const d = new Date(year, month - 1, day)
+    return isNaN(d.getTime()) ? '—' : d.toLocaleDateString('es-CL')
+  }
+  const d = new Date(fecha as string)
+  return isNaN(d.getTime()) ? '—' : d.toLocaleDateString('es-CL')
 }
 
 type Tab = 'resumen' | 'donaciones' | 'causas' | 'usuarios' | 'centros'
@@ -89,7 +168,7 @@ function ConfirmModal({ message, onConfirm, onCancel }: { message: string; onCon
 }
 
 export default function Dashboard() {
-  const { user } = useAuth()
+  const { user, token } = useAuth()
   const [tab, setTab] = useState<Tab>('resumen')
   const [causas, setCausas] = useState<Causa[]>([])
   const [donaciones, setDonaciones] = useState<DonacionExtendida[]>([])
@@ -121,15 +200,17 @@ export default function Dashboard() {
   const [showNuevoCentro, setShowNuevoCentro] = useState(false)
 
   useEffect(() => {
+    if (!token) return
     async function fetchDashboard() {
       try {
-        const { data } = await api.get<DashboardResponse>('/bff/dashboard')
-        const loadedCausas = data.causas ?? []
-        const loadedDonaciones = (data.donaciones ?? []) as DonacionExtendida[]
-        setCausas(loadedCausas)
-        setDonaciones(loadedDonaciones)
-        setTopDonadores(data.topDonadores ?? [])
-        setTotalRecaudado(data.totalRecaudado ?? loadedDonaciones.reduce((s, d) => s + d.monto, 0))
+        const [{ data }, { data: causasRaw }] = await Promise.all([
+          api.get<DashboardResponse>('/bff/dashboard'),
+          api.get<BffCausa[]>('/api/causas'),
+        ])
+        setCausas(causasRaw.map(mapBffCausa))
+        setDonaciones((data.ultimasDonaciones ?? []).map(mapBffDonacion))
+        setTopDonadores((data.topDonadores ?? []).map(mapBffTopDonador))
+        setTotalRecaudado(data.totalDonado ?? 0)
       } catch {
         setCausas(mockCausas)
         setDonaciones(mockDonaciones)
@@ -140,7 +221,7 @@ export default function Dashboard() {
       }
     }
     fetchDashboard()
-  }, [])
+  }, [token])
 
   const causasActivas = causas.filter((c) => c.activa)
   const totalMetas = causas.reduce((a, c) => a + c.meta, 0)
@@ -390,7 +471,7 @@ export default function Dashboard() {
                         <td className="px-4 py-3 font-bold text-orange-500">${d.monto.toLocaleString('es-CL')}</td>
                         <td className="px-4 py-3"><span className="text-xs bg-gray-100 text-gray-600 px-2 py-1 rounded-full">{TIPO_LABEL[d.tipo]}</span></td>
                         <td className="px-4 py-3"><span className={`text-xs px-2 py-1 rounded-full font-medium ${ESTADO_COLOR[d.estado]}`}>{ESTADO_LABEL[d.estado]}</span></td>
-                        <td className="px-4 py-3 text-gray-400 whitespace-nowrap">{new Date(d.fecha).toLocaleDateString('es-CL')}</td>
+                        <td className="px-4 py-3 text-gray-400 whitespace-nowrap">{formatDate(d.fecha)}</td>
                         <td className="px-4 py-3">
                           <div className="flex gap-1">
                             <button onClick={() => setDonacionDetalle(d)} className="p-1.5 text-gray-400 hover:text-blue-500 hover:bg-blue-50 rounded-lg transition-colors" title="Ver detalle">
@@ -452,7 +533,7 @@ export default function Dashboard() {
                         <tr key={c.id} className="hover:bg-gray-50/50 transition-colors">
                           <td className="px-4 py-3">
                             <p className="font-medium text-gray-900 max-w-[220px] truncate">{c.titulo}</p>
-                            <p className="text-xs text-gray-400">{new Date(c.fechaFin).toLocaleDateString('es-CL')}</p>
+                            <p className="text-xs text-gray-400">{formatDate(c.fechaFin)}</p>
                           </td>
                           <td className="px-4 py-3"><span className="text-xs bg-gray-100 text-gray-600 px-2 py-1 rounded-full">{c.categoria}</span></td>
                           <td className="px-4 py-3 text-gray-600">${c.meta.toLocaleString('es-CL')}</td>
@@ -614,7 +695,7 @@ export default function Dashboard() {
               <div><p className="text-xs text-gray-400">Causa</p><p className="font-medium">{donacionDetalle.causaTitulo}</p></div>
               <div><p className="text-xs text-gray-400">Tipo</p><p className="font-medium">{TIPO_LABEL[donacionDetalle.tipo]}</p></div>
               <div><p className="text-xs text-gray-400">Estado</p><span className={`text-xs px-2 py-1 rounded-full font-medium ${ESTADO_COLOR[donacionDetalle.estado]}`}>{ESTADO_LABEL[donacionDetalle.estado]}</span></div>
-              <div><p className="text-xs text-gray-400">Fecha</p><p className="font-medium">{new Date(donacionDetalle.fecha).toLocaleDateString('es-CL', { dateStyle: 'long' })}</p></div>
+              <div><p className="text-xs text-gray-400">Fecha</p><p className="font-medium">{formatDate(donacionDetalle.fecha)}</p></div>
               {donacionDetalle.destino && <div className="col-span-2"><p className="text-xs text-gray-400">Destino</p><p className="font-medium">{donacionDetalle.destino}</p></div>}
               {donacionDetalle.mensaje && <div className="col-span-2"><p className="text-xs text-gray-400">Mensaje</p><p className="italic text-gray-600">"{donacionDetalle.mensaje}"</p></div>}
             </div>
