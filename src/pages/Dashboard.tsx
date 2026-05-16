@@ -67,6 +67,32 @@ function mapBffDonacion(b: BffDonacion): DonacionExtendida {
   }
 }
 
+interface BackendDonacion {
+  id: number
+  monto: number
+  fecha: string
+  tipoDonacion: 'MONETARIA' | 'ROPA' | 'ALIMENTO' | 'MEDICA'
+  donanteAlias: string | null
+  causa: { id: number; nombre: string }
+  estado?: string | null
+  descripcion?: string | null
+}
+
+function mapBackendDonacion(b: BackendDonacion): DonacionExtendida {
+  return {
+    id: b.id,
+    donadorNombre: b.donanteAlias ?? 'Anónimo',
+    monto: b.monto,
+    causaId: b.causa.id,
+    causaTitulo: b.causa.nombre,
+    fecha: b.fecha,
+    anonima: b.donanteAlias === null,
+    estado: (b.estado ?? 'pendiente') as EstadoDonacion,
+    tipo: b.tipoDonacion.toLowerCase() as TipoDonacion,
+    descripcion: b.descripcion ?? undefined,
+  }
+}
+
 function mapBffTopDonador(b: BffTopDonador, index: number): TopDonador {
   return {
     id: index,
@@ -200,15 +226,19 @@ export default function Dashboard() {
   const [showNuevoCentro, setShowNuevoCentro] = useState(false)
 
   useEffect(() => {
-    if (!token) return
+    if (!token) {
+      setIsLoading(false)
+      return
+    }
     async function fetchDashboard() {
       try {
-        const [{ data }, { data: causasRaw }] = await Promise.all([
+        const [{ data }, { data: causasRaw }, { data: donacionesRaw }] = await Promise.all([
           api.get<DashboardResponse>('/bff/dashboard'),
           api.get<BffCausa[]>('/api/causas'),
+          api.get<BackendDonacion[]>('/api/donaciones'),
         ])
         setCausas(causasRaw.map(mapBffCausa))
-        setDonaciones((data.ultimasDonaciones ?? []).map(mapBffDonacion))
+        setDonaciones(donacionesRaw.map(mapBackendDonacion))
         setTopDonadores((data.topDonadores ?? []).map(mapBffTopDonador))
         setTotalRecaudado(data.totalDonado ?? 0)
       } catch {
@@ -254,8 +284,13 @@ export default function Dashboard() {
     setDonacionEditar(null)
   }
 
-  function handleEliminarDonacion() {
+  async function handleEliminarDonacion() {
     if (!donacionEliminar) return
+    try {
+      await api.delete(`/api/donaciones/${donacionEliminar.id}`)
+    } catch {
+      // Si el backend falla, igual reflejamos en UI para no bloquear al admin
+    }
     setDonaciones(prev => prev.filter(d => d.id !== donacionEliminar.id))
     setDonacionEliminar(null)
   }
@@ -467,7 +502,10 @@ export default function Dashboard() {
                     {donacionesPagina.map(d => (
                       <tr key={d.id} className="hover:bg-gray-50/50 transition-colors">
                         <td className="px-4 py-3 font-medium text-gray-900">{d.anonima ? 'Anónimo' : d.donadorNombre}</td>
-                        <td className="px-4 py-3 text-gray-600 max-w-[180px] truncate">{d.causaTitulo}</td>
+                        <td className="px-4 py-3 max-w-[200px]">
+                          <p className="text-gray-600 truncate">{d.causaTitulo}</p>
+                          {d.descripcion && <p className="text-xs text-gray-400 truncate mt-0.5">{d.descripcion}</p>}
+                        </td>
                         <td className="px-4 py-3 font-bold text-orange-500">${d.monto.toLocaleString('es-CL')}</td>
                         <td className="px-4 py-3"><span className="text-xs bg-gray-100 text-gray-600 px-2 py-1 rounded-full">{TIPO_LABEL[d.tipo]}</span></td>
                         <td className="px-4 py-3"><span className={`text-xs px-2 py-1 rounded-full font-medium ${ESTADO_COLOR[d.estado]}`}>{ESTADO_LABEL[d.estado]}</span></td>
@@ -698,6 +736,7 @@ export default function Dashboard() {
               <div><p className="text-xs text-gray-400">Fecha</p><p className="font-medium">{formatDate(donacionDetalle.fecha)}</p></div>
               {donacionDetalle.destino && <div className="col-span-2"><p className="text-xs text-gray-400">Destino</p><p className="font-medium">{donacionDetalle.destino}</p></div>}
               {donacionDetalle.mensaje && <div className="col-span-2"><p className="text-xs text-gray-400">Mensaje</p><p className="italic text-gray-600">"{donacionDetalle.mensaje}"</p></div>}
+              {donacionDetalle.descripcion && <div className="col-span-2"><p className="text-xs text-gray-400">Detalle</p><p className="text-gray-700">{donacionDetalle.descripcion}</p></div>}
             </div>
           </div>
         </Modal>

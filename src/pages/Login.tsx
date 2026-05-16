@@ -2,12 +2,57 @@ import { useState, useEffect, type FormEvent } from 'react'
 import { Link, useNavigate, useSearchParams } from 'react-router-dom'
 import { useAuth } from '../contexts/AuthContext'
 
+const REGIONES = [
+  'Región de Arica y Parinacota',
+  'Región de Tarapacá',
+  'Región de Antofagasta',
+  'Región de Atacama',
+  'Región de Coquimbo',
+  'Región de Valparaíso',
+  'Región Metropolitana de Santiago',
+  "Región del Libertador General Bernardo O'Higgins",
+  'Región del Maule',
+  'Región del Ñuble',
+  'Región del Biobío',
+  'Región de La Araucanía',
+  'Región de Los Ríos',
+  'Región de Los Lagos',
+  'Región de Aysén del General Carlos Ibáñez del Campo',
+  'Región de Magallanes y de la Antártica Chilena',
+]
+
+function formatRut(raw: string): string {
+  const clean = raw.replace(/[^0-9kK]/g, '').toUpperCase()
+  if (clean.length < 2) return clean
+  const dv = clean.slice(-1)
+  const body = clean.slice(0, -1)
+  const formatted = body.replace(/\B(?=(\d{3})+(?!\d))/g, '.')
+  return `${formatted}-${dv}`
+}
+
+function validateRutDv(rut: string): boolean {
+  const clean = rut.replace(/[^0-9kK]/g, '').toUpperCase()
+  if (clean.length < 2) return false
+  const dv = clean.slice(-1)
+  const body = clean.slice(0, -1)
+  if (!/^\d+$/.test(body)) return false
+  let sum = 0
+  let mul = 2
+  for (let i = body.length - 1; i >= 0; i--) {
+    sum += parseInt(body[i]) * mul
+    mul = mul === 7 ? 2 : mul + 1
+  }
+  const rem = 11 - (sum % 11)
+  const expected = rem === 11 ? '0' : rem === 10 ? 'K' : String(rem)
+  return dv === expected
+}
+
 export default function Login() {
   const [params] = useSearchParams()
   const [modo, setModo] = useState<'login' | 'registro'>(
     params.get('modo') === 'registro' ? 'registro' : 'login'
   )
-  const [form, setForm] = useState({ nombre: '', email: '', password: '', confirmar: '' })
+  const [form, setForm] = useState({ nombre: '', email: '', password: '', confirmar: '', rut: '', telefono: '', region: '' })
   const [error, setError] = useState('')
   const [loading, setLoading] = useState(false)
   const { login, register, isAuthenticated } = useAuth()
@@ -17,8 +62,14 @@ export default function Login() {
     if (isAuthenticated) navigate('/')
   }, [isAuthenticated, navigate])
 
-  function handleChange(e: React.ChangeEvent<HTMLInputElement>) {
+  function handleChange(e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) {
     setForm((f) => ({ ...f, [e.target.name]: e.target.value }))
+    setError('')
+  }
+
+  function handleRutChange(e: React.ChangeEvent<HTMLInputElement>) {
+    const raw = e.target.value.replace(/[^0-9kK]/g, '')
+    setForm((f) => ({ ...f, rut: formatRut(raw) }))
     setError('')
   }
 
@@ -41,7 +92,19 @@ export default function Login() {
           setLoading(false)
           return
         }
-        await register({ nombre: form.nombre, email: form.email, password: form.password })
+        if (!validateRutDv(form.rut)) {
+          setError('El RUT ingresado no es válido')
+          setLoading(false)
+          return
+        }
+        await register({
+          nombre: form.nombre,
+          email: form.email,
+          password: form.password,
+          rut: form.rut,
+          telefono: form.telefono || undefined,
+          region: form.region || undefined,
+        })
       }
       navigate('/')
     } catch (err: unknown) {
@@ -106,6 +169,24 @@ export default function Login() {
               </div>
             )}
 
+            {modo === 'registro' && (
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1.5">
+                  RUT
+                </label>
+                <input
+                  type="text"
+                  name="rut"
+                  value={form.rut}
+                  onChange={handleRutChange}
+                  required
+                  placeholder="12.345.678-9"
+                  maxLength={12}
+                  className="w-full border border-gray-200 rounded-xl px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-orange-400 focus:border-transparent transition"
+                />
+              </div>
+            )}
+
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1.5">
                 Correo electrónico
@@ -150,6 +231,41 @@ export default function Login() {
                   placeholder="••••••••"
                   className="w-full border border-gray-200 rounded-xl px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-orange-400 focus:border-transparent transition"
                 />
+              </div>
+            )}
+
+            {modo === 'registro' && (
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1.5">
+                  Teléfono <span className="text-gray-400 font-normal">(opcional)</span>
+                </label>
+                <input
+                  type="tel"
+                  name="telefono"
+                  value={form.telefono}
+                  onChange={handleChange}
+                  placeholder="+56 9 1234 5678"
+                  className="w-full border border-gray-200 rounded-xl px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-orange-400 focus:border-transparent transition"
+                />
+              </div>
+            )}
+
+            {modo === 'registro' && (
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1.5">
+                  Región <span className="text-gray-400 font-normal">(opcional)</span>
+                </label>
+                <select
+                  name="region"
+                  value={form.region}
+                  onChange={handleChange}
+                  className="w-full border border-gray-200 rounded-xl px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-orange-400 focus:border-transparent transition bg-white"
+                >
+                  <option value="">Selecciona tu región</option>
+                  {REGIONES.map((r) => (
+                    <option key={r} value={r}>{r}</option>
+                  ))}
+                </select>
               </div>
             )}
 

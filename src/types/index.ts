@@ -47,6 +47,7 @@ export interface DonacionExtendida extends Donacion {
   estado: EstadoDonacion
   tipo: TipoDonacion
   destino?: string
+  descripcion?: string
 }
 
 export interface TopDonador {
@@ -66,6 +67,9 @@ export interface RegisterData {
   nombre: string
   email: string
   password: string
+  rut: string
+  telefono?: string
+  region?: string
 }
 
 export interface AuthResponse {

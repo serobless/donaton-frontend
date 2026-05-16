@@ -32,6 +32,7 @@ interface BackendDonacion {
   donanteAlias: string | null
   causa: { id: number; nombre: string }
   donadorId: string | null
+  descripcion?: string | null
 }
 
 function formatDate(fecha: unknown): string {
@@ -56,6 +57,7 @@ function mapBackendDonacion(b: BackendDonacion): DonacionExtendida {
     anonima: b.donanteAlias === null,
     estado: 'pendiente',
     tipo: b.tipoDonacion.toLowerCase() as TipoDonacion,
+    descripcion: b.descripcion ?? undefined,
   }
 }
 
@@ -107,6 +109,11 @@ export default function Donaciones() {
   // Form nueva donación
   const [showForm, setShowForm] = useState(false)
   const [form, setForm] = useState({ causaId: '', monto: '', mensaje: '', anonima: false, tipo: 'monetaria' as TipoDonacion })
+  const [formExtra, setFormExtra] = useState({
+    cantidadPrendas: '', tipoPrenda: 'Abrigo/Chaqueta', talla: 'M', estadoPrenda: 'Muy bueno',
+    cantidad: '', unidad: 'kg', tipoAlimento: '',
+    descripcionMedica: '', cantidadMedica: '',
+  })
   const [success, setSuccess] = useState(false)
   const [loading, setLoading] = useState(false)
 
@@ -117,7 +124,10 @@ export default function Donaciones() {
   const [editForm, setEditForm] = useState({ causaId: '', monto: '', mensaje: '', tipo: 'monetaria' as TipoDonacion })
 
   useEffect(() => {
-    if (!token) return
+    if (!token) {
+      setHistorialLoading(false)
+      return
+    }
     async function fetchDonaciones() {
       try {
         const { data } = await api.get<BackendDonacion[]>('/api/donaciones/mis-donaciones')
@@ -149,17 +159,34 @@ export default function Donaciones() {
 
   async function handleDonar(e: React.FormEvent) {
     e.preventDefault()
-    if (!form.causaId || !form.monto || !user) return
+    if (!form.causaId || !user) return
+    if (form.tipo === 'monetaria' && !form.monto) return
     setLoading(true)
 
     const causa = causasActivas.find(c => c.id === Number(form.causaId))
     if (!causa) { setLoading(false); return }
 
+    const descripcion = form.tipo === 'ropa'
+      ? `${formExtra.cantidadPrendas} prendas | ${formExtra.tipoPrenda} | Talla ${formExtra.talla} | ${formExtra.estadoPrenda}`
+      : form.tipo === 'alimento'
+      ? `${formExtra.cantidad} ${formExtra.unidad} de ${formExtra.tipoAlimento}`
+      : form.tipo === 'medica'
+      ? `${formExtra.descripcionMedica} x${formExtra.cantidadMedica}`
+      : null
+    const cantidad = form.tipo === 'ropa' ? (Number(formExtra.cantidadPrendas) || null)
+      : form.tipo === 'alimento' ? (Number(formExtra.cantidad) || null)
+      : form.tipo === 'medica' ? (Number(formExtra.cantidadMedica) || null)
+      : null
+    const unidad = form.tipo === 'alimento' ? formExtra.unidad : null
+
     const payload = {
       causaId: causa.id,
       tipoDonacion: form.tipo.toUpperCase(),
-      monto: Number(form.monto),
+      monto: form.tipo === 'monetaria' ? Number(form.monto) : 0,
       donanteAlias: form.anonima ? null : user.nombre,
+      descripcion,
+      cantidad,
+      unidad,
     }
 
     try {
@@ -171,7 +198,7 @@ export default function Donaciones() {
         id: Date.now(),
         donadorNombre: form.anonima ? 'Anónimo' : user.nombre,
         donadorEmail: form.anonima ? undefined : user.email,
-        monto: Number(form.monto),
+        monto: form.tipo === 'monetaria' ? Number(form.monto) : 0,
         causaId: causa.id,
         causaTitulo: causa.titulo,
         fecha: new Date().toISOString(),
@@ -179,6 +206,7 @@ export default function Donaciones() {
         anonima: form.anonima,
         estado: 'pendiente',
         tipo: form.tipo,
+        descripcion: descripcion ?? undefined,
       }
       setDonaciones(prev => [nueva, ...prev])
     }
@@ -187,6 +215,7 @@ export default function Donaciones() {
     setSuccess(true)
     setShowForm(false)
     setForm({ causaId: '', monto: '', mensaje: '', anonima: false, tipo: 'monetaria' })
+    setFormExtra({ cantidadPrendas: '', tipoPrenda: 'Abrigo/Chaqueta', talla: 'M', estadoPrenda: 'Muy bueno', cantidad: '', unidad: 'kg', tipoAlimento: '', descripcionMedica: '', cantidadMedica: '' })
     setTimeout(() => setSuccess(false), 4000)
   }
 
@@ -278,17 +307,90 @@ export default function Donaciones() {
                 </div>
               </div>
 
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1.5">Monto (CLP)</label>
-                <div className="flex flex-wrap gap-2 mb-2">
-                  {montosSugeridos.map(m => (
-                    <button key={m} type="button" onClick={() => setForm(f => ({ ...f, monto: String(m) }))} className={`px-3 py-1.5 rounded-lg text-xs font-semibold border transition-colors ${form.monto === String(m) ? 'bg-orange-500 text-white border-orange-500' : 'border-gray-200 text-gray-600 hover:border-orange-300'}`}>
-                      ${m.toLocaleString('es-CL')}
-                    </button>
-                  ))}
+              {form.tipo === 'monetaria' && (
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1.5">Monto (CLP)</label>
+                  <div className="flex flex-wrap gap-2 mb-2">
+                    {montosSugeridos.map(m => (
+                      <button key={m} type="button" onClick={() => setForm(f => ({ ...f, monto: String(m) }))} className={`px-3 py-1.5 rounded-lg text-xs font-semibold border transition-colors ${form.monto === String(m) ? 'bg-orange-500 text-white border-orange-500' : 'border-gray-200 text-gray-600 hover:border-orange-300'}`}>
+                        ${m.toLocaleString('es-CL')}
+                      </button>
+                    ))}
+                  </div>
+                  <input type="number" min="1000" value={form.monto} onChange={e => setForm(f => ({ ...f, monto: e.target.value }))} placeholder="Otro monto..." required className="w-full border border-gray-200 rounded-xl px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-orange-400" />
                 </div>
-                <input type="number" min="1000" value={form.monto} onChange={e => setForm(f => ({ ...f, monto: e.target.value }))} placeholder="Otro monto..." required className="w-full border border-gray-200 rounded-xl px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-orange-400" />
-              </div>
+              )}
+
+              {form.tipo === 'ropa' && (
+                <div className="grid grid-cols-2 gap-3">
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1.5">Cantidad de prendas</label>
+                    <input type="number" min="1" value={formExtra.cantidadPrendas} onChange={e => setFormExtra(f => ({ ...f, cantidadPrendas: e.target.value }))} placeholder="Ej: 5" required className="w-full border border-gray-200 rounded-xl px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-orange-400" />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1.5">Tipo de prenda</label>
+                    <select value={formExtra.tipoPrenda} onChange={e => setFormExtra(f => ({ ...f, tipoPrenda: e.target.value }))} className="w-full border border-gray-200 rounded-xl px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-orange-400 bg-white">
+                      <option>Abrigo/Chaqueta</option>
+                      <option>Polera</option>
+                      <option>Pantalón</option>
+                      <option>Calzado</option>
+                      <option>Frazada</option>
+                      <option>Accesorios (gorros/guantes)</option>
+                    </select>
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1.5">Talla</label>
+                    <select value={formExtra.talla} onChange={e => setFormExtra(f => ({ ...f, talla: e.target.value }))} className="w-full border border-gray-200 rounded-xl px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-orange-400 bg-white">
+                      <option>XS</option><option>S</option><option>M</option><option>L</option>
+                      <option>XL</option><option>XXL</option><option>Única</option><option>Niño</option>
+                    </select>
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1.5">Estado</label>
+                    <select value={formExtra.estadoPrenda} onChange={e => setFormExtra(f => ({ ...f, estadoPrenda: e.target.value }))} className="w-full border border-gray-200 rounded-xl px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-orange-400 bg-white">
+                      <option>Muy bueno</option>
+                      <option>Bueno</option>
+                    </select>
+                  </div>
+                </div>
+              )}
+
+              {form.tipo === 'alimento' && (
+                <div className="space-y-3">
+                  <div className="grid grid-cols-2 gap-3">
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-1.5">Cantidad</label>
+                      <input type="number" min="1" value={formExtra.cantidad} onChange={e => setFormExtra(f => ({ ...f, cantidad: e.target.value }))} placeholder="Ej: 10" required className="w-full border border-gray-200 rounded-xl px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-orange-400" />
+                    </div>
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-1.5">Unidad</label>
+                      <select value={formExtra.unidad} onChange={e => setFormExtra(f => ({ ...f, unidad: e.target.value }))} className="w-full border border-gray-200 rounded-xl px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-orange-400 bg-white">
+                        <option value="kg">kg</option>
+                        <option value="unidades">unidades</option>
+                        <option value="cajas">cajas</option>
+                        <option value="litros">litros</option>
+                      </select>
+                    </div>
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1.5">Tipo de alimento</label>
+                    <input type="text" value={formExtra.tipoAlimento} onChange={e => setFormExtra(f => ({ ...f, tipoAlimento: e.target.value }))} placeholder="Ej: arroz, leche, conservas..." required className="w-full border border-gray-200 rounded-xl px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-orange-400" />
+                  </div>
+                </div>
+              )}
+
+              {form.tipo === 'medica' && (
+                <div className="space-y-3">
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1.5">Insumo médico</label>
+                    <input type="text" value={formExtra.descripcionMedica} onChange={e => setFormExtra(f => ({ ...f, descripcionMedica: e.target.value }))} placeholder="Ej: Paracetamol 500mg, vendas, guantes..." required className="w-full border border-gray-200 rounded-xl px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-orange-400" />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1.5">Cantidad</label>
+                    <input type="number" min="1" value={formExtra.cantidadMedica} onChange={e => setFormExtra(f => ({ ...f, cantidadMedica: e.target.value }))} placeholder="Ej: 20" required className="w-full border border-gray-200 rounded-xl px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-orange-400" />
+                  </div>
+                </div>
+              )}
 
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1.5">Mensaje (opcional)</label>
@@ -358,6 +460,7 @@ export default function Donaciones() {
                         <span className={`text-xs px-2 py-0.5 rounded-full font-medium flex-shrink-0 ${ESTADO_COLOR[d.estado]}`}>{ESTADO_LABEL[d.estado]}</span>
                         <span className="text-xs bg-gray-100 text-gray-500 px-2 py-0.5 rounded-full flex-shrink-0">{TIPO_LABEL[d.tipo]}</span>
                       </div>
+                      {d.descripcion && <p className="text-xs text-gray-400 mt-0.5">{d.descripcion}</p>}
                       {d.mensaje && <p className="text-xs text-gray-500 mt-0.5 italic">"{d.mensaje}"</p>}
                       <p className="text-xs text-gray-400 mt-1">
                         {formatDate(d.fecha)}
@@ -405,6 +508,7 @@ export default function Donaciones() {
               <div><p className="text-xs text-gray-400 mb-1">Tipo</p><p className="font-medium">{TIPO_LABEL[donacionDetalle.tipo]}</p></div>
               <div><p className="text-xs text-gray-400 mb-1">Fecha</p><p className="font-medium">{formatDate(donacionDetalle.fecha)}</p></div>
               {donacionDetalle.destino && <div><p className="text-xs text-gray-400 mb-1">Destino</p><p className="font-medium">{donacionDetalle.destino}</p></div>}
+              {donacionDetalle.descripcion && <div className="col-span-2"><p className="text-xs text-gray-400 mb-1">Detalle</p><p className="text-gray-700 text-sm">{donacionDetalle.descripcion}</p></div>}
               {donacionDetalle.mensaje && <div className="col-span-2"><p className="text-xs text-gray-400 mb-1">Mensaje</p><p className="italic text-gray-600">"{donacionDetalle.mensaje}"</p></div>}
             </div>
             {/* Timeline de estados */}

@@ -82,7 +82,7 @@ export default function CausaCard({ causa }: Props) {
         </div>
 
         <Link
-          to={`/causas/${causa.id}`}
+          to="/donaciones"
           className="w-full flex items-center justify-center gap-2 bg-orange-500 hover:bg-orange-600 active:bg-orange-700 text-white font-bold text-sm py-3 rounded-xl transition-colors duration-150 mt-auto"
         >
           <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 24 24">

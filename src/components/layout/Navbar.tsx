@@ -23,7 +23,7 @@ export default function Navbar() {
       <div className="max-w-6xl mx-auto px-6 relative flex items-center justify-between h-16">
 
           {/* ── Logo — left ── */}
-          <Link to="/" className="flex items-center gap-2 flex-shrink-0">
+          <Link to="/" onClick={() => window.scrollTo(0, 0)} className="flex items-center gap-2 flex-shrink-0">
             <div className="w-8 h-8 rounded-lg bg-orange-500 flex items-center justify-center shadow-sm">
               <svg className="w-4 h-4 text-white" fill="currentColor" viewBox="0 0 24 24">
                 <path d="M12 21.593c-.525-.445-6.703-5.728-8.079-7.183C1.722 12.109 1.5 10.5 1.5 9.25 1.5 6.527 3.675 4.5 6.25 4.5c1.52 0 2.98.716 3.75 1.903C10.77 5.216 12.23 4.5 13.75 4.5c2.575 0 4.75 2.027 4.75 4.75 0 1.25-.222 2.859-2.421 5.16C14.702 15.866 12.524 21.148 12 21.593z" />
@@ -36,7 +36,7 @@ export default function Navbar() {
 
           {/* ── Nav links — absolutely centered ── */}
           <nav className="hidden md:flex absolute left-1/2 -translate-x-1/2 items-center gap-8">
-            <NavLink to="/" end className={linkClass}>Inicio</NavLink>
+            <NavLink to="/" end onClick={() => window.scrollTo(0, 0)} className={linkClass}>Inicio</NavLink>
             <NavLink to="/transparencia" className={linkClass}>Transparencia</NavLink>
             {isAuthenticated && (
               <NavLink to="/donaciones" className={linkClass}>Mis donaciones</NavLink>
@@ -118,7 +118,7 @@ export default function Navbar() {
                   isActive ? 'bg-orange-50 text-orange-600' : 'text-gray-600 hover:bg-gray-50'
                 }`
               }
-              onClick={() => setMenuOpen(false)}
+              onClick={() => { setMenuOpen(false); window.scrollTo(0, 0) }}
             >
               {item.label}
             </NavLink>
@@ -135,7 +135,7 @@ export default function Navbar() {
               <Link
                 to="/login"
                 className="block text-center bg-orange-500 hover:bg-orange-600 text-white font-bold text-sm py-3 rounded-full transition-colors"
-                onClick={() => setMenuOpen(false)}
+                onClick={() => { setMenuOpen(false); window.scrollTo(0, 0) }}
               >
                 Donar ahora
               </Link>

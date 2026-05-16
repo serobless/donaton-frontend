@@ -629,7 +629,7 @@ export default function Home() {
       ══════════════════════════════════════ */}
       <section className="relative py-20 bg-white overflow-hidden">
         <img
-          src="https://images.unsplash.com/photo-1593113630400-ea4288922559?w=1400"
+          src="https://images.unsplash.com/photo-1488521787991-ed7bbaae773c?w=1400"
           alt=""
           className="absolute inset-0 w-full h-full object-cover opacity-10"
         />

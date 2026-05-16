@@ -50,6 +50,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   useEffect(() => {
     function handleUnauthorized() {
+      localStorage.removeItem(TOKEN_KEY)
+      localStorage.removeItem(USER_KEY)
       setToken(null)
       setUser(null)
     }
@@ -99,10 +101,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
   }
 
-  async function register({ nombre, email, password }: RegisterData) {
+  async function register({ nombre, email, password, rut, telefono, region }: RegisterData) {
     setIsLoading(true)
     try {
-      const { data } = await api.post<BackendAuthResponse>('/auth/register', { nombre, email, password })
+      const { data } = await api.post<BackendAuthResponse>('/auth/register', { nombre, email, password, rut, telefono, region })
       localStorage.setItem(TOKEN_KEY, data.token)
       let loggedUser: User
       try {
