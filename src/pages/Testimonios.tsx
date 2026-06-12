@@ -13,7 +13,6 @@ import {
   BlockQuote,
   List,
 } from 'ckeditor5'
-import 'ckeditor5/ckeditor5.css'
 import { useAuth } from '../contexts/AuthContext'
 import TestimonioCard from '../components/ui/TestimonioCard'
 import api from '../lib/axios'
@@ -59,7 +58,7 @@ export default function Testimonios() {
     },
   })
 
-  function handleSubmit(e: React.FormEvent) {
+  function handleSubmit(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault()
     if (!titulo.trim() || !contenido.trim()) {
       setError('El título y el contenido son obligatorios.')
@@ -134,6 +133,7 @@ export default function Testimonios() {
                 <CKEditor
                   editor={ClassicEditor}
                   config={{
+                    licenseKey: 'GPL',
                     plugins: [Essentials, Bold, Italic, Link, MediaEmbed, Paragraph, Heading, BlockQuote, List],
                     toolbar: {
                       items: ['heading', '|', 'bold', 'italic', 'link', '|', 'bulletedList', 'numberedList', '|', 'blockQuote', 'mediaEmbed'],
