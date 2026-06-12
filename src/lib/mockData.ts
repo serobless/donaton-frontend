@@ -268,6 +268,7 @@ export const mockCentrosAcopio: CentroAcopio[] = [
     capacidadActual: 340,
     capacidadMax: 500,
     activo: true,
+    coordenadas: { lat: -33.4489, lng: -70.6693 },
   },
   {
     id: 2,
@@ -281,6 +282,7 @@ export const mockCentrosAcopio: CentroAcopio[] = [
     capacidadActual: 210,
     capacidadMax: 400,
     activo: true,
+    coordenadas: { lat: -33.4183, lng: -70.6508 },
   },
   {
     id: 3,
@@ -294,6 +296,7 @@ export const mockCentrosAcopio: CentroAcopio[] = [
     capacidadActual: 180,
     capacidadMax: 300,
     activo: true,
+    coordenadas: { lat: -33.5000, lng: -70.6500 },
   },
   {
     id: 4,
@@ -307,6 +310,7 @@ export const mockCentrosAcopio: CentroAcopio[] = [
     capacidadActual: 290,
     capacidadMax: 350,
     activo: true,
+    coordenadas: { lat: -33.4372, lng: -70.6196 },
   },
   {
     id: 5,
@@ -320,6 +324,7 @@ export const mockCentrosAcopio: CentroAcopio[] = [
     capacidadActual: 420,
     capacidadMax: 600,
     activo: true,
+    coordenadas: { lat: -33.5123, lng: -70.7601 },
   },
   {
     id: 6,
@@ -333,6 +338,7 @@ export const mockCentrosAcopio: CentroAcopio[] = [
     capacidadActual: 150,
     capacidadMax: 280,
     activo: true,
+    coordenadas: { lat: -33.0472, lng: -71.6127 },
   },
   {
     id: 7,
@@ -346,6 +352,7 @@ export const mockCentrosAcopio: CentroAcopio[] = [
     capacidadActual: 95,
     capacidadMax: 200,
     activo: true,
+    coordenadas: { lat: -33.0245, lng: -71.5518 },
   },
   {
     id: 8,
@@ -359,6 +366,7 @@ export const mockCentrosAcopio: CentroAcopio[] = [
     capacidadActual: 310,
     capacidadMax: 450,
     activo: true,
+    coordenadas: { lat: -36.8201, lng: -73.0444 },
   },
   {
     id: 9,
@@ -372,6 +380,7 @@ export const mockCentrosAcopio: CentroAcopio[] = [
     capacidadActual: 140,
     capacidadMax: 250,
     activo: false,
+    coordenadas: { lat: -36.7246, lng: -73.1171 },
   },
 ]
 

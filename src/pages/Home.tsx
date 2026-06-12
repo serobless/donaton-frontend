@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { useDonacion } from '../contexts/DonacionContext'
 import CausaCard from '../components/ui/CausaCard'
+import MapaCentros from '../components/ui/MapaCentros'
 import { useCountUp } from '../lib/useCountUp'
 import { mockCentrosAcopio, mockImpactoRegion, mockPartners } from '../lib/mockData'
 
@@ -364,6 +365,11 @@ export default function Home() {
                 {r}
               </button>
             ))}
+          </div>
+
+          {/* Mapa interactivo */}
+          <div className="mb-10">
+            <MapaCentros centros={centrosFiltrados} />
           </div>
 
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5">

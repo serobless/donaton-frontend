@@ -38,6 +38,7 @@ export default function Navbar() {
           <nav className="hidden md:flex absolute left-1/2 -translate-x-1/2 items-center gap-8">
             <NavLink to="/" end onClick={() => window.scrollTo(0, 0)} className={linkClass}>Inicio</NavLink>
             <NavLink to="/transparencia" className={linkClass}>Transparencia</NavLink>
+            <NavLink to="/testimonios" className={linkClass}>Testimonios</NavLink>
             {isAuthenticated && (
               <NavLink to="/donaciones" className={linkClass}>Mis donaciones</NavLink>
             )}
@@ -106,6 +107,7 @@ export default function Navbar() {
           {[
             { to: '/', label: 'Inicio', end: true },
             { to: '/transparencia', label: 'Transparencia' },
+            { to: '/testimonios', label: 'Testimonios' },
             ...(isAuthenticated ? [{ to: '/donaciones', label: 'Mis donaciones' }] : []),
             ...(user?.rol?.toLowerCase() === 'admin' ? [{ to: '/dashboard', label: 'Dashboard' }] : []),
           ].map((item) => (

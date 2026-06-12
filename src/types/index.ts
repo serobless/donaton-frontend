@@ -146,3 +146,19 @@ export interface ChartDataMonth {
   monetario: number
   especie: number
 }
+
+export interface Testimonio {
+  id: number
+  titulo: string
+  contenido: string
+  autorId?: string
+  autorNombre: string
+  fechaCreacion: string
+  imagenUrl?: string
+}
+
+export interface TestimonioRequest {
+  titulo: string
+  contenido: string
+  imagenUrl?: string
+}
