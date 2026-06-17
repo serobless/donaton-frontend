@@ -12,6 +12,7 @@ import Transparencia from './pages/Transparencia'
 import Donaciones from './pages/Donaciones'
 import Testimonios from './pages/Testimonios'
 import Campanas from './pages/Campanas'
+import MapaNecesidades from './pages/MapaNecesidades'
 
 const queryClient = new QueryClient()
 
@@ -29,6 +30,7 @@ export default function App() {
                 <Route path="/transparencia" element={<Transparencia />} />
                 <Route path="/testimonios" element={<Testimonios />} />
                 <Route path="/campanas" element={<Campanas />} />
+                <Route path="/mapa-necesidades" element={<MapaNecesidades />} />
 
                 {/* Rutas protegidas para cualquier usuario autenticado */}
                 <Route element={<ProtectedRoute />}>

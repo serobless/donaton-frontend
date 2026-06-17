@@ -39,6 +39,7 @@ export default function Navbar() {
             <NavLink to="/" end onClick={() => window.scrollTo(0, 0)} className={linkClass}>Inicio</NavLink>
             <NavLink to="/transparencia" className={linkClass}>Transparencia</NavLink>
             <NavLink to="/campanas" className={linkClass}>Campañas</NavLink>
+            <NavLink to="/mapa-necesidades" className={linkClass}>Mapa</NavLink>
             <NavLink to="/testimonios" className={linkClass}>Testimonios</NavLink>
             {isAuthenticated && (
               <NavLink to="/donaciones" className={linkClass}>Mis donaciones</NavLink>
@@ -109,6 +110,7 @@ export default function Navbar() {
             { to: '/', label: 'Inicio', end: true },
             { to: '/transparencia', label: 'Transparencia' },
             { to: '/campanas', label: 'Campañas' },
+            { to: '/mapa-necesidades', label: 'Mapa de Necesidades' },
             { to: '/testimonios', label: 'Testimonios' },
             ...(isAuthenticated ? [{ to: '/donaciones', label: 'Mis donaciones' }] : []),
             ...(user?.rol?.toLowerCase() === 'admin' ? [{ to: '/dashboard', label: 'Dashboard' }] : []),

@@ -6,8 +6,6 @@ import {
   mockCausas,
   mockDonaciones,
   mockTopDonadores,
-  mockUsers,
-  mockCentrosAcopio,
   mockChartData,
 } from '../lib/mockData'
 import api from '../lib/axios'
@@ -32,9 +30,37 @@ interface BffTopDonador {
   cantidadDonaciones?: number
 }
 
-interface BffCausa {
+const CIUDADES_CHILE = [
+  { ciudad: 'Santiago',      region: 'Metropolitana', lat: -33.4489, lng: -70.6693 },
+  { ciudad: 'Puente Alto',   region: 'Metropolitana', lat: -33.6116, lng: -70.5757 },
+  { ciudad: 'Maipú',         region: 'Metropolitana', lat: -33.5123, lng: -70.7601 },
+  { ciudad: 'La Florida',    region: 'Metropolitana', lat: -33.5205, lng: -70.5990 },
+  { ciudad: 'Valparaíso',    region: 'Valparaíso',    lat: -33.0472, lng: -71.6127 },
+  { ciudad: 'Viña del Mar',  region: 'Valparaíso',    lat: -33.0245, lng: -71.5518 },
+  { ciudad: 'Quilpué',       region: 'Valparaíso',    lat: -33.0499, lng: -71.4415 },
+  { ciudad: 'Concepción',    region: 'Biobío',        lat: -36.8201, lng: -73.0444 },
+  { ciudad: 'Talcahuano',    region: 'Biobío',        lat: -36.7246, lng: -73.1171 },
+  { ciudad: 'Los Ángeles',   region: 'Biobío',        lat: -37.4720, lng: -72.3540 },
+  { ciudad: 'Temuco',        region: 'Araucanía',     lat: -38.7359, lng: -72.5904 },
+  { ciudad: 'Padre Las Casas', region: 'Araucanía',   lat: -38.7714, lng: -72.5750 },
+  { ciudad: 'Talca',         region: 'Maule',         lat: -35.4264, lng: -71.6554 },
+  { ciudad: 'Curicó',        region: 'Maule',         lat: -34.9824, lng: -71.2389 },
+  { ciudad: 'La Serena',     region: 'Coquimbo',      lat: -29.9027, lng: -71.2520 },
+  { ciudad: 'Coquimbo',      region: 'Coquimbo',      lat: -29.9533, lng: -71.3436 },
+  { ciudad: 'Antofagasta',   region: 'Antofagasta',   lat: -23.6509, lng: -70.3975 },
+  { ciudad: 'Iquique',       region: 'Tarapacá',      lat: -20.2208, lng: -70.1431 },
+  { ciudad: 'Arica',         region: 'Arica y Parinacota', lat: -18.4783, lng: -70.3126 },
+  { ciudad: 'Puerto Montt',  region: 'Los Lagos',     lat: -41.4717, lng: -72.9370 },
+  { ciudad: 'Osorno',        region: 'Los Lagos',     lat: -40.5738, lng: -73.1336 },
+  { ciudad: 'Valdivia',      region: 'Los Ríos',      lat: -39.8142, lng: -73.2459 },
+  { ciudad: 'Rancagua',      region: "O'Higgins",     lat: -34.1703, lng: -70.7444 },
+  { ciudad: 'Copiapó',       region: 'Atacama',       lat: -27.3669, lng: -70.3323 },
+  { ciudad: 'Punta Arenas',  region: 'Magallanes',    lat: -53.1638, lng: -70.9171 },
+]
+
+interface ApiCausa {
   id: number
-  nombre: string
+  titulo: string
   descripcion?: string
   meta: number
   recaudado: number
@@ -42,6 +68,16 @@ interface BffCausa {
   categoria: string
   imagenUrl?: string
   diasRestantes?: number
+  destacada?: boolean
+  urgencia?: string
+}
+
+interface BackendUsuario {
+  id: number
+  nombre: string
+  email: string
+  rol: string
+  fechaRegistro?: string
 }
 
 interface DashboardResponse {
@@ -53,19 +89,6 @@ interface DashboardResponse {
   mensajeError?: string
 }
 
-function mapBffDonacion(b: BffDonacion): DonacionExtendida {
-  return {
-    id: b.id,
-    donadorNombre: b.donadorNombre ?? 'Anónimo',
-    monto: b.monto,
-    causaId: 0,
-    causaTitulo: b.causaNombre ?? '',
-    fecha: b.fecha,
-    anonima: b.donadorNombre === null,
-    estado: (b.estado ?? 'pendiente') as EstadoDonacion,
-    tipo: 'monetaria',
-  }
-}
 
 interface BackendDonacion {
   id: number
@@ -73,7 +96,8 @@ interface BackendDonacion {
   fecha: string
   tipoDonacion: 'MONETARIA' | 'ROPA' | 'ALIMENTO' | 'MEDICA'
   donanteAlias: string | null
-  causa: { id: number; nombre: string }
+  causa: { id: number; titulo: string }
+  centroAcopio?: { id: number; nombre: string } | null
   estado?: string | null
   descripcion?: string | null
 }
@@ -84,7 +108,8 @@ function mapBackendDonacion(b: BackendDonacion): DonacionExtendida {
     donadorNombre: b.donanteAlias ?? 'Anónimo',
     monto: b.monto,
     causaId: b.causa.id,
-    causaTitulo: b.causa.nombre,
+    causaTitulo: b.causa.titulo,
+    centroNombre: b.centroAcopio?.nombre,
     fecha: b.fecha,
     anonima: b.donanteAlias === null,
     estado: (b.estado ?? 'pendiente') as EstadoDonacion,
@@ -102,10 +127,10 @@ function mapBffTopDonador(b: BffTopDonador, index: number): TopDonador {
   }
 }
 
-function mapBffCausa(c: BffCausa): Causa {
+function mapApiCausa(c: ApiCausa): Causa {
   return {
     id: c.id,
-    titulo: c.nombre,
+    titulo: c.titulo,
     descripcion: c.descripcion ?? '',
     imagen: c.imagenUrl ?? '',
     meta: c.meta,
@@ -114,6 +139,18 @@ function mapBffCausa(c: BffCausa): Causa {
     activa: c.activa,
     fechaFin: '',
     diasRestantes: c.diasRestantes,
+    destacada: c.destacada,
+    urgencia: c.urgencia,
+  }
+}
+
+function mapBackendUsuario(u: BackendUsuario): User {
+  return {
+    id: u.id,
+    nombre: u.nombre,
+    email: u.email,
+    rol: u.rol.toUpperCase() === 'ADMIN' ? 'admin' : 'donador',
+    fechaRegistro: u.fechaRegistro,
   }
 }
 
@@ -199,8 +236,8 @@ export default function Dashboard() {
   const [causas, setCausas] = useState<Causa[]>([])
   const [donaciones, setDonaciones] = useState<DonacionExtendida[]>([])
   const [topDonadores, setTopDonadores] = useState<TopDonador[]>([])
-  const [usuarios, setUsuarios] = useState<User[]>(mockUsers)
-  const [centros, setCentros] = useState<CentroAcopio[]>(mockCentrosAcopio)
+  const [usuarios, setUsuarios] = useState<User[]>([])
+  const [centros, setCentros] = useState<CentroAcopio[]>([])
   const [totalRecaudado, setTotalRecaudado] = useState(0)
   const [isLoading, setIsLoading] = useState(true)
 
@@ -224,6 +261,11 @@ export default function Dashboard() {
   // Modal centros
   const [centroEditar, setCentroEditar] = useState<CentroAcopio | null>(null)
   const [showNuevoCentro, setShowNuevoCentro] = useState(false)
+  const [nuevoCentroLat, setNuevoCentroLat] = useState('')
+  const [nuevoCentroLng, setNuevoCentroLng] = useState('')
+  const [horarioDias, setHorarioDias] = useState('Lun-Vie')
+  const [horarioAbre, setHorarioAbre] = useState('09:00')
+  const [horarioCierra, setHorarioCierra] = useState('18:00')
 
   useEffect(() => {
     if (!token) {
@@ -234,10 +276,10 @@ export default function Dashboard() {
       try {
         const [{ data }, { data: causasRaw }, { data: donacionesRaw }] = await Promise.all([
           api.get<DashboardResponse>('/bff/dashboard'),
-          api.get<BffCausa[]>('/api/causas'),
+          api.get<ApiCausa[]>('/api/causas'),
           api.get<BackendDonacion[]>('/api/donaciones'),
         ])
-        setCausas(causasRaw.map(mapBffCausa))
+        setCausas(causasRaw.map(mapApiCausa))
         setDonaciones(donacionesRaw.map(mapBackendDonacion))
         setTopDonadores((data.topDonadores ?? []).map(mapBffTopDonador))
         setTotalRecaudado(data.totalDonado ?? 0)
@@ -251,6 +293,17 @@ export default function Dashboard() {
       }
     }
     fetchDashboard()
+  }, [token])
+
+  useEffect(() => {
+    if (!token) return
+    // Cargas independientes: si una falla, la otra no se ve afectada
+    api.get<BackendUsuario[]>('/admin/usuarios')
+      .then(({ data }) => setUsuarios(data.map(mapBackendUsuario)))
+      .catch(() => { /* usuarios no disponibles */ })
+    api.get<CentroAcopio[]>('/api/centros')
+      .then(({ data }) => setCentros(data))
+      .catch(() => { /* centros no disponibles */ })
   }, [token])
 
   const causasActivas = causas.filter((c) => c.activa)
@@ -299,20 +352,38 @@ export default function Dashboard() {
     setCausas(prev => prev.map(c => c.id === id ? { ...c, activa: !c.activa } : c))
   }
 
-  function handleEliminarCausa() {
+  async function handleEliminarCausa() {
     if (!causaEliminar) return
+    try {
+      await api.delete(`/api/causas/${causaEliminar.id}`)
+    } catch {
+      // eliminar igual en UI
+    }
     setCausas(prev => prev.filter(c => c.id !== causaEliminar.id))
     setCausaEliminar(null)
   }
 
-  function handleToggleCentro(id: number) {
-    setCentros(prev => prev.map(c => c.id === id ? { ...c, activo: !c.activo } : c))
+  async function handleEliminarCentro(id: number) {
+    try {
+      await api.delete(`/api/centros/${id}`)
+    } catch {
+      // eliminar igual en UI
+    }
+    setCentros(prev => prev.filter(c => c.id !== id))
   }
 
-  function handleCambiarRol(id: number) {
-    setUsuarios(prev => prev.map(u =>
-      u.id === id ? { ...u, rol: u.rol === 'admin' ? 'donador' : 'admin' } : u
-    ))
+  async function handleCambiarRol(id: number) {
+    const u = usuarios.find(usr => usr.id === id)
+    if (!u) return
+    const nuevoRolBackend = u.rol === 'admin' ? 'DONANTE' : 'ADMIN'
+    try {
+      await api.patch(`/admin/usuarios/${id}/rol`, { rol: nuevoRolBackend })
+      setUsuarios(prev => prev.map(usr =>
+        usr.id === id ? { ...usr, rol: u.rol === 'admin' ? 'donador' : 'admin' } : usr
+      ))
+    } catch {
+      alert('Error al cambiar el rol.')
+    }
   }
 
   if (isLoading) {
@@ -378,7 +449,7 @@ export default function Dashboard() {
                     <CartesianGrid strokeDasharray="3 3" stroke="#f3f4f6" />
                     <XAxis dataKey="mes" tick={{ fontSize: 11, fill: '#9ca3af' }} />
                     <YAxis tick={{ fontSize: 10, fill: '#9ca3af' }} tickFormatter={(v) => `$${(v/1000000).toFixed(1)}M`} width={50} />
-                    <Tooltip formatter={(v: number) => [`$${v.toLocaleString('es-CL')}`, '']} labelStyle={{ fontWeight: 600 }} />
+                    <Tooltip formatter={(v) => [`$${Number(v).toLocaleString('es-CL')}`, '']} labelStyle={{ fontWeight: 600 }} />
                     <Bar dataKey="monetario" name="Monetario" stackId="a" fill="#F97316" radius={[0,0,0,0]} />
                     <Bar dataKey="especie" name="En especie" stackId="a" fill="#FED7AA" radius={[4,4,0,0]} />
                   </BarChart>
@@ -491,6 +562,7 @@ export default function Dashboard() {
                     <tr className="bg-gray-50 text-left">
                       <th className="px-4 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wide">Donador</th>
                       <th className="px-4 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wide">Causa</th>
+                      <th className="px-4 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wide">Centro</th>
                       <th className="px-4 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wide">Monto</th>
                       <th className="px-4 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wide">Tipo</th>
                       <th className="px-4 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wide">Estado</th>
@@ -502,9 +574,14 @@ export default function Dashboard() {
                     {donacionesPagina.map(d => (
                       <tr key={d.id} className="hover:bg-gray-50/50 transition-colors">
                         <td className="px-4 py-3 font-medium text-gray-900">{d.anonima ? 'Anónimo' : d.donadorNombre}</td>
-                        <td className="px-4 py-3 max-w-[200px]">
+                        <td className="px-4 py-3 max-w-[180px]">
                           <p className="text-gray-600 truncate">{d.causaTitulo}</p>
                           {d.descripcion && <p className="text-xs text-gray-400 truncate mt-0.5">{d.descripcion}</p>}
+                        </td>
+                        <td className="px-4 py-3 text-xs text-gray-500 max-w-[140px]">
+                          {d.centroNombre
+                            ? <span className="flex items-center gap-1"><span className="text-orange-400">📍</span><span className="truncate">{d.centroNombre}</span></span>
+                            : <span className="text-gray-300">—</span>}
                         </td>
                         <td className="px-4 py-3 font-bold text-orange-500">${d.monto.toLocaleString('es-CL')}</td>
                         <td className="px-4 py-3"><span className="text-xs bg-gray-100 text-gray-600 px-2 py-1 rounded-full">{TIPO_LABEL[d.tipo]}</span></td>
@@ -677,6 +754,7 @@ export default function Dashboard() {
                       <th className="px-4 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wide">Región</th>
                       <th className="px-4 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wide">Dirección</th>
                       <th className="px-4 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wide">Capacidad</th>
+                      <th className="px-4 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wide">Donaciones</th>
                       <th className="px-4 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wide">Estado</th>
                       <th className="px-4 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wide">Acciones</th>
                     </tr>
@@ -697,6 +775,14 @@ export default function Dashboard() {
                               <span className="text-xs text-gray-500">{c.capacidadActual}/{c.capacidadMax}</span>
                             </div>
                           </td>
+                          <td className="px-4 py-3 text-center">
+                            {(() => {
+                              const count = donaciones.filter(d => d.centroNombre === c.nombre).length
+                              return count > 0
+                                ? <span className="text-xs font-semibold text-orange-600 bg-orange-50 px-2 py-1 rounded-full">{count}</span>
+                                : <span className="text-xs text-gray-300">—</span>
+                            })()}
+                          </td>
                           <td className="px-4 py-3">
                             <span className={`text-xs px-2 py-1 rounded-full font-medium ${c.activo ? 'bg-green-100 text-green-700' : 'bg-gray-100 text-gray-500'}`}>
                               {c.activo ? 'Activo' : 'Cerrado'}
@@ -704,11 +790,11 @@ export default function Dashboard() {
                           </td>
                           <td className="px-4 py-3">
                             <div className="flex gap-1">
-                              <button onClick={() => setCentroEditar(c)} className="p-1.5 text-gray-400 hover:text-orange-500 hover:bg-orange-50 rounded-lg transition-colors">
+                              <button onClick={() => setCentroEditar(c)} className="p-1.5 text-gray-400 hover:text-orange-500 hover:bg-orange-50 rounded-lg transition-colors" title="Editar">
                                 <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" /></svg>
                               </button>
-                              <button onClick={() => handleToggleCentro(c.id)} className="p-1.5 text-gray-400 hover:text-emerald-500 hover:bg-emerald-50 rounded-lg transition-colors">
-                                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 9l3 3-3 3m5 0h3M5 20h14a2 2 0 002-2V6a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" /></svg>
+                              <button onClick={() => handleEliminarCentro(c.id)} className="p-1.5 text-gray-400 hover:text-red-500 hover:bg-red-50 rounded-lg transition-colors" title="Eliminar">
+                                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" /></svg>
                               </button>
                             </div>
                           </td>
@@ -734,6 +820,7 @@ export default function Dashboard() {
               <div><p className="text-xs text-gray-400">Tipo</p><p className="font-medium">{TIPO_LABEL[donacionDetalle.tipo]}</p></div>
               <div><p className="text-xs text-gray-400">Estado</p><span className={`text-xs px-2 py-1 rounded-full font-medium ${ESTADO_COLOR[donacionDetalle.estado]}`}>{ESTADO_LABEL[donacionDetalle.estado]}</span></div>
               <div><p className="text-xs text-gray-400">Fecha</p><p className="font-medium">{formatDate(donacionDetalle.fecha)}</p></div>
+              {donacionDetalle.centroNombre && <div className="col-span-2"><p className="text-xs text-gray-400">Centro de acopio</p><p className="font-medium text-orange-600">📍 {donacionDetalle.centroNombre}</p></div>}
               {donacionDetalle.destino && <div className="col-span-2"><p className="text-xs text-gray-400">Destino</p><p className="font-medium">{donacionDetalle.destino}</p></div>}
               {donacionDetalle.mensaje && <div className="col-span-2"><p className="text-xs text-gray-400">Mensaje</p><p className="italic text-gray-600">"{donacionDetalle.mensaje}"</p></div>}
               {donacionDetalle.descripcion && <div className="col-span-2"><p className="text-xs text-gray-400">Detalle</p><p className="text-gray-700">{donacionDetalle.descripcion}</p></div>}
@@ -776,16 +863,21 @@ export default function Dashboard() {
       {/* ═══ MODAL: Editar causa ═══ */}
       {causaEditar && (
         <Modal title="Editar causa" onClose={() => setCausaEditar(null)}>
-          <form onSubmit={e => {
+          <form onSubmit={async e => {
             e.preventDefault()
             const fd = new FormData(e.currentTarget)
-            setCausas(prev => prev.map(c => c.id === causaEditar.id ? {
-              ...c,
+            const body = {
               titulo: fd.get('titulo') as string,
               descripcion: fd.get('descripcion') as string,
               meta: Number(fd.get('meta')),
-              fechaFin: fd.get('fechaFin') as string,
-            } : c))
+              categoria: causaEditar.categoria,
+            }
+            try {
+              const { data } = await api.put<ApiCausa>(`/api/causas/${causaEditar.id}`, body)
+              setCausas(prev => prev.map(c => c.id === causaEditar.id ? mapApiCausa(data) : c))
+            } catch {
+              setCausas(prev => prev.map(c => c.id === causaEditar.id ? { ...c, ...body } : c))
+            }
             setCausaEditar(null)
           }} className="space-y-3">
             <div>
@@ -817,21 +909,21 @@ export default function Dashboard() {
       {/* ═══ MODAL: Nueva causa ═══ */}
       {showNuevaCausa && (
         <Modal title="Nueva causa" onClose={() => setShowNuevaCausa(false)}>
-          <form onSubmit={e => {
+          <form onSubmit={async e => {
             e.preventDefault()
             const fd = new FormData(e.currentTarget)
-            const nueva: Causa = {
-              id: Date.now(),
+            const body = {
               titulo: fd.get('titulo') as string,
               descripcion: fd.get('descripcion') as string,
-              imagen: 'https://images.unsplash.com/photo-1593113616828-6f22bca04804?w=600&auto=format',
               meta: Number(fd.get('meta')),
-              recaudado: 0,
               categoria: fd.get('categoria') as string,
-              activa: true,
-              fechaFin: fd.get('fechaFin') as string,
             }
-            setCausas(prev => [...prev, nueva])
+            try {
+              const { data } = await api.post<ApiCausa>('/api/causas', body)
+              setCausas(prev => [...prev, mapApiCausa(data)])
+            } catch {
+              alert('Error al crear la causa. Verifica que ms-donaciones esté activo.')
+            }
             setShowNuevaCausa(false)
           }} className="space-y-3">
             <div>
@@ -882,16 +974,28 @@ export default function Dashboard() {
       {/* ═══ MODAL: Editar centro ═══ */}
       {centroEditar && (
         <Modal title="Editar centro de acopio" onClose={() => setCentroEditar(null)}>
-          <form onSubmit={e => {
+          <form onSubmit={async e => {
             e.preventDefault()
             const fd = new FormData(e.currentTarget)
-            setCentros(prev => prev.map(c => c.id === centroEditar.id ? {
-              ...c,
+            const body = {
               nombre: fd.get('nombre') as string,
               direccion: fd.get('direccion') as string,
+              region: centroEditar.region,
+              ciudad: centroEditar.ciudad,
               horario: fd.get('horario') as string,
               telefono: fd.get('telefono') as string,
-            } : c))
+              queRecibe: centroEditar.queRecibe,
+              capacidadActual: centroEditar.capacidadActual,
+              capacidadMax: centroEditar.capacidadMax,
+              latitud: centroEditar.latitud,
+              longitud: centroEditar.longitud,
+            }
+            try {
+              const { data } = await api.put<CentroAcopio>(`/api/centros/${centroEditar.id}`, body)
+              setCentros(prev => prev.map(c => c.id === centroEditar.id ? data : c))
+            } catch {
+              setCentros(prev => prev.map(c => c.id === centroEditar.id ? { ...c, ...body } : c))
+            }
             setCentroEditar(null)
           }} className="space-y-3">
             <div>
@@ -920,62 +1024,106 @@ export default function Dashboard() {
 
       {/* ═══ MODAL: Nuevo centro ═══ */}
       {showNuevoCentro && (
-        <Modal title="Nuevo centro de acopio" onClose={() => setShowNuevoCentro(false)}>
-          <form onSubmit={e => {
+        <Modal title="Nuevo centro de acopio" onClose={() => { setShowNuevoCentro(false); setNuevoCentroLat(''); setNuevoCentroLng(''); setHorarioDias('Lun-Vie'); setHorarioAbre('09:00'); setHorarioCierra('18:00') }}>
+          <form onSubmit={async e => {
             e.preventDefault()
             const fd = new FormData(e.currentTarget)
-            const nuevo: CentroAcopio = {
-              id: Date.now(),
+            const ciudadVal = fd.get('ciudad') as string
+            const ciudadData = CIUDADES_CHILE.find(c => c.ciudad === ciudadVal)
+            const body = {
               nombre: fd.get('nombre') as string,
               direccion: fd.get('direccion') as string,
-              region: fd.get('region') as string,
-              ciudad: fd.get('ciudad') as string,
-              horario: fd.get('horario') as string,
+              region: ciudadData?.region ?? (fd.get('region') as string),
+              ciudad: ciudadVal,
+              horario: `${horarioDias} ${horarioAbre}-${horarioCierra}`,
               telefono: fd.get('telefono') as string,
               queRecibe: ['Ropa de abrigo'],
               capacidadActual: 0,
               capacidadMax: Number(fd.get('capacidadMax')),
-              activo: true,
+              latitud: nuevoCentroLat ? Number(nuevoCentroLat) : null,
+              longitud: nuevoCentroLng ? Number(nuevoCentroLng) : null,
             }
-            setCentros(prev => [...prev, nuevo])
+            try {
+              const { data } = await api.post<CentroAcopio>('/api/centros', body)
+              setCentros(prev => [...prev, data])
+            } catch {
+              alert('Error al crear el centro. Verifica que ms-donaciones esté activo.')
+            }
             setShowNuevoCentro(false)
+            setNuevoCentroLat('')
+            setNuevoCentroLng('')
+            setHorarioDias('Lun-Vie')
+            setHorarioAbre('09:00')
+            setHorarioCierra('18:00')
           }} className="space-y-3">
             <div className="grid grid-cols-2 gap-3">
               <div className="col-span-2">
-                <label className="block text-xs font-medium text-gray-600 mb-1">Nombre</label>
-                <input name="nombre" required placeholder="Centro Santiago..." className="w-full border border-gray-200 rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-orange-400" />
-              </div>
-              <div>
-                <label className="block text-xs font-medium text-gray-600 mb-1">Región</label>
-                <select name="region" className="w-full border border-gray-200 rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-orange-400 bg-white">
-                  <option>Metropolitana</option>
-                  <option>Valparaíso</option>
-                  <option>Biobío</option>
-                  <option>Araucanía</option>
-                  <option>Maule</option>
-                  <option>Coquimbo</option>
-                </select>
-              </div>
-              <div>
-                <label className="block text-xs font-medium text-gray-600 mb-1">Ciudad</label>
-                <input name="ciudad" required placeholder="Santiago..." className="w-full border border-gray-200 rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-orange-400" />
+                <label className="block text-xs font-medium text-gray-600 mb-1">Nombre del centro</label>
+                <input name="nombre" required placeholder="Centro Santiago Poniente..." className="w-full border border-gray-200 rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-orange-400" />
               </div>
               <div className="col-span-2">
-                <label className="block text-xs font-medium text-gray-600 mb-1">Dirección</label>
+                <label className="block text-xs font-medium text-gray-600 mb-1">Ciudad <span className="text-orange-500 font-normal">(ubica el pin en el mapa)</span></label>
+                <select
+                  name="ciudad"
+                  required
+                  className="w-full border border-gray-200 rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-orange-400 bg-white"
+                  onChange={e => {
+                    const found = CIUDADES_CHILE.find(c => c.ciudad === e.target.value)
+                    setNuevoCentroLat(found ? String(found.lat) : '')
+                    setNuevoCentroLng(found ? String(found.lng) : '')
+                  }}
+                >
+                  <option value="">— Selecciona ciudad —</option>
+                  {CIUDADES_CHILE.map(c => (
+                    <option key={c.ciudad} value={c.ciudad}>{c.ciudad} ({c.region})</option>
+                  ))}
+                </select>
+                {nuevoCentroLat && (
+                  <p className="text-xs text-green-600 mt-1">📍 Coordenadas detectadas: {nuevoCentroLat}, {nuevoCentroLng}</p>
+                )}
+              </div>
+              <div className="col-span-2">
+                <label className="block text-xs font-medium text-gray-600 mb-1">Dirección exacta</label>
                 <input name="direccion" placeholder="Av. Principal 123..." className="w-full border border-gray-200 rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-orange-400" />
               </div>
-              <div>
-                <label className="block text-xs font-medium text-gray-600 mb-1">Horario</label>
-                <input name="horario" placeholder="Lun-Vie 9:00-18:00" className="w-full border border-gray-200 rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-orange-400" />
+              <div className="col-span-2">
+                <label className="block text-xs font-medium text-gray-600 mb-1">Horario de atención</label>
+                <div className="flex gap-2 items-center">
+                  <select
+                    value={horarioDias}
+                    onChange={e => setHorarioDias(e.target.value)}
+                    className="flex-1 border border-gray-200 rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-orange-400"
+                  >
+                    <option>Lun-Vie</option>
+                    <option>Lun-Sáb</option>
+                    <option>Lun-Dom</option>
+                    <option>Mar-Sáb</option>
+                    <option>Todos los días</option>
+                  </select>
+                  <input
+                    type="time"
+                    value={horarioAbre}
+                    onChange={e => setHorarioAbre(e.target.value)}
+                    className="border border-gray-200 rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-orange-400"
+                  />
+                  <span className="text-gray-400 text-sm flex-shrink-0">a</span>
+                  <input
+                    type="time"
+                    value={horarioCierra}
+                    onChange={e => setHorarioCierra(e.target.value)}
+                    className="border border-gray-200 rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-orange-400"
+                  />
+                </div>
+                <p className="text-xs text-gray-400 mt-1">Vista previa: {horarioDias} {horarioAbre}-{horarioCierra}</p>
               </div>
-              <div>
-                <label className="block text-xs font-medium text-gray-600 mb-1">Capacidad máx.</label>
-                <input type="number" name="capacidadMax" defaultValue={300} className="w-full border border-gray-200 rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-orange-400" />
+              <div className="col-span-2">
+                <label className="block text-xs font-medium text-gray-600 mb-1">Capacidad máxima (unidades)</label>
+                <input type="number" name="capacidadMax" defaultValue={300} min={1} className="w-40 border border-gray-200 rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-orange-400" />
               </div>
             </div>
             <div className="flex gap-3 pt-2">
               <button type="submit" className="flex-1 bg-orange-500 hover:bg-orange-600 text-white font-bold py-2.5 rounded-xl text-sm transition-colors">Crear centro</button>
-              <button type="button" onClick={() => setShowNuevoCentro(false)} className="px-5 py-2.5 border border-gray-200 rounded-xl text-gray-600 text-sm hover:bg-gray-50 transition-colors">Cancelar</button>
+              <button type="button" onClick={() => { setShowNuevoCentro(false); setNuevoCentroLat(''); setNuevoCentroLng('') }} className="px-5 py-2.5 border border-gray-200 rounded-xl text-gray-600 text-sm hover:bg-gray-50 transition-colors">Cancelar</button>
             </div>
           </form>
         </Modal>

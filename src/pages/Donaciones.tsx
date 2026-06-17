@@ -1,7 +1,8 @@
 import { useState, useEffect } from 'react'
+import { useSearchParams } from 'react-router-dom'
 import { useAuth } from '../contexts/AuthContext'
 import { useDonacion } from '../contexts/DonacionContext'
-import type { DonacionExtendida, EstadoDonacion, TipoDonacion } from '../types'
+import type { CentroAcopio, DonacionExtendida, EstadoDonacion, TipoDonacion } from '../types'
 import { mockDonaciones } from '../lib/mockData'
 import api from '../lib/axios'
 
@@ -30,7 +31,8 @@ interface BackendDonacion {
   fecha: string
   tipoDonacion: 'MONETARIA' | 'ROPA' | 'ALIMENTO' | 'MEDICA'
   donanteAlias: string | null
-  causa: { id: number; nombre: string }
+  causa: { id: number; titulo: string }
+  centroAcopio?: { id: number; nombre: string } | null
   donadorId: string | null
   descripcion?: string | null
 }
@@ -52,7 +54,8 @@ function mapBackendDonacion(b: BackendDonacion): DonacionExtendida {
     donadorNombre: b.donanteAlias ?? 'Anónimo',
     monto: b.monto,
     causaId: b.causa.id,
-    causaTitulo: b.causa.nombre,
+    causaTitulo: b.causa.titulo,
+    centroNombre: b.centroAcopio?.nombre,
     fecha: b.fecha,
     anonima: b.donanteAlias === null,
     estado: 'pendiente',
@@ -99,6 +102,7 @@ function ConfirmModal({ message, confirmLabel, confirmColor, onConfirm, onCancel
 export default function Donaciones() {
   const { user, token } = useAuth()
   const { causasActivas } = useDonacion()
+  const [searchParams] = useSearchParams()
   const [donaciones, setDonaciones] = useState<DonacionExtendida[]>([])
   const [historialLoading, setHistorialLoading] = useState(true)
 
@@ -106,9 +110,22 @@ export default function Donaciones() {
   const [filtroEstado, setFiltroEstado] = useState<string>('todos')
   const [filtroCausa, setFiltroCausa] = useState<string>('todas')
 
-  // Form nueva donación
-  const [showForm, setShowForm] = useState(false)
-  const [form, setForm] = useState({ causaId: '', monto: '', mensaje: '', anonima: false, tipo: 'monetaria' as TipoDonacion })
+  // Pre-fill tipo desde ?tipo= (viene del Mapa de Necesidades)
+  const tiposValidos: TipoDonacion[] = ['monetaria', 'ropa', 'alimento', 'medica']
+  const tipoParam = searchParams.get('tipo') as TipoDonacion | null
+  const tipoInicial: TipoDonacion = tipoParam && tiposValidos.includes(tipoParam) ? tipoParam : 'monetaria'
+
+  // Centros de acopio
+  const [centros, setCentros] = useState<CentroAcopio[]>([])
+  useEffect(() => {
+    api.get<CentroAcopio[]>('/api/centros')
+      .then(({ data }) => setCentros(data.filter(c => c.activo)))
+      .catch(() => { /* sin centros, el selector queda vacío */ })
+  }, [])
+
+  // Form nueva donación — se abre automáticamente si viene con ?tipo=
+  const [showForm, setShowForm] = useState(!!tipoParam)
+  const [form, setForm] = useState({ causaId: '', centroAcopioId: '', monto: '', mensaje: '', anonima: false, tipo: tipoInicial })
   const [formExtra, setFormExtra] = useState({
     cantidadPrendas: '', tipoPrenda: 'Abrigo/Chaqueta', talla: 'M', estadoPrenda: 'Muy bueno',
     cantidad: '', unidad: 'kg', tipoAlimento: '',
@@ -181,6 +198,7 @@ export default function Donaciones() {
 
     const payload = {
       causaId: causa.id,
+      centroAcopioId: form.centroAcopioId ? Number(form.centroAcopioId) : null,
       tipoDonacion: form.tipo.toUpperCase(),
       monto: form.tipo === 'monetaria' ? Number(form.monto) : 0,
       donanteAlias: form.anonima ? null : user.nombre,
@@ -214,7 +232,7 @@ export default function Donaciones() {
     setLoading(false)
     setSuccess(true)
     setShowForm(false)
-    setForm({ causaId: '', monto: '', mensaje: '', anonima: false, tipo: 'monetaria' })
+    setForm({ causaId: '', centroAcopioId: '', monto: '', mensaje: '', anonima: false, tipo: 'monetaria' })
     setFormExtra({ cantidadPrendas: '', tipoPrenda: 'Abrigo/Chaqueta', talla: 'M', estadoPrenda: 'Muy bueno', cantidad: '', unidad: 'kg', tipoAlimento: '', descripcionMedica: '', cantidadMedica: '' })
     setTimeout(() => setSuccess(false), 4000)
   }
@@ -306,6 +324,24 @@ export default function Donaciones() {
                   </select>
                 </div>
               </div>
+
+              {centros.length > 0 && (
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1.5">
+                    Centro de acopio <span className="text-gray-400 font-normal text-xs">(opcional — ¿dónde entregarás tu donación?)</span>
+                  </label>
+                  <select
+                    value={form.centroAcopioId}
+                    onChange={e => setForm(f => ({ ...f, centroAcopioId: e.target.value }))}
+                    className="w-full border border-gray-200 rounded-xl px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-orange-400 bg-white"
+                  >
+                    <option value="">— Sin centro específico —</option>
+                    {centros.map(c => (
+                      <option key={c.id} value={c.id}>{c.nombre} · {c.ciudad}, {c.region}</option>
+                    ))}
+                  </select>
+                </div>
+              )}
 
               {form.tipo === 'monetaria' && (
                 <div>
@@ -462,6 +498,12 @@ export default function Donaciones() {
                       </div>
                       {d.descripcion && <p className="text-xs text-gray-400 mt-0.5">{d.descripcion}</p>}
                       {d.mensaje && <p className="text-xs text-gray-500 mt-0.5 italic">"{d.mensaje}"</p>}
+                      {d.centroNombre && (
+                        <p className="text-xs text-orange-500 mt-0.5 flex items-center gap-1">
+                          <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z"/><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 11a3 3 0 11-6 0 3 3 0 016 0z"/></svg>
+                          {d.centroNombre}
+                        </p>
+                      )}
                       <p className="text-xs text-gray-400 mt-1">
                         {formatDate(d.fecha)}
                         {d.destino && ` · ${d.destino}`}

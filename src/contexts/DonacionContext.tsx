@@ -3,10 +3,10 @@ import type { Causa, TopDonador } from '../types'
 import { mockCausas, mockDonaciones, mockTopDonadores } from '../lib/mockData'
 import api from '../lib/axios'
 
-// Shape real del BFF /bff/portada
+// Causa directa desde ms-donaciones /api/causas
 interface BackendCausa {
   id: number
-  nombre: string
+  titulo: string
   meta: number
   recaudado: number
   activa: boolean
@@ -21,15 +21,12 @@ interface BackendCausa {
 }
 
 interface PortadaResponse {
-  causasActivas: BackendCausa[]
   topDonadores: TopDonador[]
   resumen?: {
     totalRecaudado?: number
     totalDonaciones?: number
     causasActivas?: number
   }
-  // compatibilidad por si el backend cambia a estas claves
-  causas?: BackendCausa[]
   totalRecaudado?: number
   totalDonaciones?: number
 }
@@ -54,7 +51,7 @@ function mapCausa(b: BackendCausa): Causa {
   }
   return {
     id: b.id,
-    titulo: b.nombre,
+    titulo: b.titulo,
     descripcion: b.descripcion ?? '',
     imagen: b.imagenUrl ?? b.imagen ?? '',
     meta: b.meta,
@@ -87,32 +84,23 @@ export function DonacionProvider({ children }: { children: ReactNode }) {
   const [isLoading, setIsLoading] = useState(true)
 
   useEffect(() => {
-    async function fetchPortada() {
+    async function fetchData() {
+      try {
+        // Causas directo desde ms-donaciones (BFF devuelve nombre:null tras el rename)
+        const { data: causasData } = await api.get<BackendCausa[]>('/api/causas')
+        setCausas(causasData.map(mapCausa))
+      } catch {
+        setCausas(mockCausas)
+      }
+
       try {
         const { data } = await api.get<PortadaResponse>('/bff/portada')
-
-        console.log('[DonacionContext] respuesta raw /bff/portada:', data)
-
-        // El BFF devuelve causasActivas (o causas como fallback de compatibilidad)
-        const rawCausas = data.causasActivas ?? data.causas ?? []
-        console.log('[DonacionContext] rawCausas antes de mapear:', rawCausas)
-        const mapped = rawCausas.map(mapCausa)
-        console.log('[DonacionContext] causas mapeadas:', mapped)
-        setCausas(mapped)
         setTopDonadores(data.topDonadores ?? [])
-
-        const rec =
-          data.resumen?.totalRecaudado ??
-          data.totalRecaudado ??
-          mapped.reduce((s, c) => s + c.recaudado, 0)
-        const don =
-          data.resumen?.totalDonaciones ??
-          data.totalDonaciones ??
-          0
+        const rec = data.resumen?.totalRecaudado ?? data.totalRecaudado ?? 0
+        const don = data.resumen?.totalDonaciones ?? data.totalDonaciones ?? 0
         setTotalRecaudado(rec)
         setTotalDonaciones(don)
       } catch {
-        setCausas(mockCausas)
         setTopDonadores(mockTopDonadores)
         setTotalRecaudado(mockDonaciones.reduce((s, d) => s + d.monto, 0))
         setTotalDonaciones(mockDonaciones.length)
@@ -120,7 +108,7 @@ export function DonacionProvider({ children }: { children: ReactNode }) {
         setIsLoading(false)
       }
     }
-    fetchPortada()
+    fetchData()
   }, [])
 
   const causasActivas = causas.filter((c) => c.activa)

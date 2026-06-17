@@ -5,6 +5,8 @@ import CausaCard from '../components/ui/CausaCard'
 import MapaCentros from '../components/ui/MapaCentros'
 import { useCountUp } from '../lib/useCountUp'
 import { mockCentrosAcopio, mockImpactoRegion, mockPartners } from '../lib/mockData'
+import api from '../lib/axios'
+import type { CentroAcopio, Necesidad } from '../types'
 
 /* ─── Animated stat ─── */
 function AnimatedStat({ target, prefix = '', suffix = '', label, icon }: {
@@ -111,10 +113,21 @@ export default function Home() {
   const [enviandoVol, setEnviandoVol] = useState(false)
   const [exitoVol, setExitoVol] = useState(false)
 
-  // Centros — filtro región
+  // Centros — carga desde API con fallback a mock
+  const [centros, setCentros] = useState<CentroAcopio[]>(mockCentrosAcopio)
+  const [necesidades, setNecesidades] = useState<Necesidad[]>([])
+  useEffect(() => {
+    api.get<CentroAcopio[]>('/api/centros')
+      .then(({ data }) => { if (data.length > 0) setCentros(data) })
+      .catch(() => { /* usa mock como fallback */ })
+    api.get<Necesidad[]>('/api/necesidades')
+      .then(({ data }) => { if (data.length > 0) setNecesidades(data) })
+      .catch(() => { /* sin necesidades del backend, no mostramos badges */ })
+  }, [])
+
   const [regionFiltro, setRegionFiltro] = useState('Todas')
-  const regiones = ['Todas', ...Array.from(new Set(mockCentrosAcopio.map(c => c.region)))]
-  const centrosFiltrados = regionFiltro === 'Todas' ? mockCentrosAcopio : mockCentrosAcopio.filter(c => c.region === regionFiltro)
+  const regiones = ['Todas', ...Array.from(new Set(centros.map(c => c.region)))]
+  const centrosFiltrados = regionFiltro === 'Todas' ? centros : centros.filter(c => c.region === regionFiltro)
 
   // Campaña invierno — progreso simulado
   const campanaMeta = 5000
@@ -402,14 +415,20 @@ export default function Home() {
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5">
             {centrosFiltrados.filter(c => c.activo).map(centro => {
               const pct = Math.round((centro.capacidadActual / centro.capacidadMax) * 100)
+              const urgentes = necesidades.filter(n => n.centro?.id === centro.id && n.urgente && n.activa)
               return (
-                <div key={centro.id} className="bg-white rounded-2xl border border-gray-100 shadow-sm p-5 hover:border-orange-200 transition-colors">
+                <div key={centro.id} className={`bg-white rounded-2xl border shadow-sm p-5 hover:border-orange-200 transition-colors ${urgentes.length > 0 ? 'border-red-200' : 'border-gray-100'}`}>
                   <div className="flex items-start justify-between mb-3">
                     <div className="flex-1 min-w-0">
                       <h3 className="font-bold text-gray-900 text-sm">{centro.nombre}</h3>
                       <span className="text-xs bg-orange-50 text-orange-600 px-2 py-0.5 rounded-full mt-1 inline-block">{centro.region} · {centro.ciudad}</span>
                     </div>
-                    <div className={`w-2.5 h-2.5 rounded-full flex-shrink-0 mt-1 ${centro.activo ? 'bg-green-400' : 'bg-gray-300'}`} />
+                    <div className="flex items-center gap-1.5 flex-shrink-0 mt-0.5">
+                      {urgentes.length > 0 && (
+                        <span className="text-[10px] bg-red-100 text-red-700 font-bold px-1.5 py-0.5 rounded-full">{urgentes.length} URGENTE{urgentes.length > 1 ? 'S' : ''}</span>
+                      )}
+                      <div className={`w-2.5 h-2.5 rounded-full ${centro.activo ? 'bg-green-400' : 'bg-gray-300'}`} />
+                    </div>
                   </div>
                   <div className="space-y-2 text-xs text-gray-500 mb-4">
                     <p className="flex items-center gap-1.5">
@@ -442,6 +461,17 @@ export default function Home() {
                 </div>
               )
             })}
+          </div>
+
+          {/* CTA Mapa de Necesidades */}
+          <div className="mt-8 text-center">
+            <Link
+              to="/mapa-necesidades"
+              className="inline-flex items-center gap-2 bg-orange-500 hover:bg-orange-600 text-white font-semibold px-6 py-3 rounded-full transition-colors shadow-sm"
+            >
+              🗺️ Ver mapa de necesidades urgentes
+            </Link>
+            <p className="text-xs text-gray-400 mt-2">Descubre qué necesita cada centro y dona exactamente lo que hace falta.</p>
           </div>
         </div>
       </section>

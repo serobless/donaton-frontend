@@ -17,7 +17,9 @@ interface Props {
 }
 
 export default function MapaCentros({ centros }: Props) {
-  const conCoordenadas = centros.filter((c) => c.coordenadas && c.activo)
+  const coordValida = (lat?: number | null, lng?: number | null) =>
+    lat != null && lng != null && lat >= -90 && lat <= 90 && lng >= -180 && lng <= 180
+  const conCoordenadas = centros.filter((c) => coordValida(c.latitud, c.longitud) && c.activo)
 
   useEffect(() => {
     // Invalidate map size after mount to fix tile loading in hidden containers
@@ -42,12 +44,12 @@ export default function MapaCentros({ centros }: Props) {
       >
         <TileLayer
           attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>'
-          url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
+          url="https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png"
         />
         {conCoordenadas.map((centro) => (
           <Marker
             key={centro.id}
-            position={[centro.coordenadas!.lat, centro.coordenadas!.lng]}
+            position={[centro.latitud!, centro.longitud!]}
           >
             <Popup>
               <div className="min-w-[180px]">

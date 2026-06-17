@@ -65,6 +65,7 @@ export interface DonacionExtendida extends Donacion {
   tipo: TipoDonacion
   destino?: string
   descripcion?: string
+  centroNombre?: string
 }
 
 export interface TopDonador {
@@ -123,7 +124,20 @@ export interface CentroAcopio {
   capacidadActual: number
   capacidadMax: number
   activo: boolean
-  coordenadas?: { lat: number; lng: number }
+  latitud?: number
+  longitud?: number
+}
+
+export interface Necesidad {
+  id: number
+  centro?: { id: number; nombre: string }
+  tipo: string
+  descripcion?: string
+  metaUnidades: number
+  unidadesActuales: number
+  urgente: boolean
+  diasRestantes?: number
+  activa: boolean
 }
 
 export interface EvidenciaCampana {
