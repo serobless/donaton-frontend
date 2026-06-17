@@ -1,6 +1,5 @@
 import { createContext, useContext, useEffect, useState, type ReactNode } from 'react'
 import type { LoginCredentials, RegisterData, User } from '../types'
-import { mockUsers } from '../lib/mockData'
 import api from '../lib/axios'
 
 interface AuthContextValue {
@@ -22,11 +21,11 @@ interface BackendAuthResponse {
   token: string
   email: string
   nombre: string
-  rol: 'admin' | 'donador'
+  rol: string  // backend envía "ADMIN" o "DONANTE" (enum Java)
 }
 
-function isNetworkError(err: unknown): boolean {
-  return !!(err && typeof err === 'object' && !('response' in err) && 'request' in err)
+function normalizeRol(rol: string): 'admin' | 'donador' {
+  return rol.toUpperCase() === 'ADMIN' ? 'admin' : 'donador'
 }
 
 export function AuthProvider({ children }: { children: ReactNode }) {
@@ -75,27 +74,17 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       try {
         loggedUser = await fetchMe(data.token)
       } catch {
-        loggedUser = { id: 0, nombre: data.nombre, email: data.email, rol: data.rol }
+        loggedUser = { id: 0, nombre: data.nombre, email: data.email, rol: normalizeRol(data.rol) }
       }
       localStorage.setItem(USER_KEY, JSON.stringify(loggedUser))
       setToken(data.token)
       setUser(loggedUser)
     } catch (err: unknown) {
-      if (isNetworkError(err)) {
-        const found = mockUsers.find((u) => u.email === email)
-        if (!found || password !== '123456') throw new Error('Credenciales incorrectas')
-        const fakeToken = btoa(`${found.id}:${found.email}:${Date.now()}`)
-        localStorage.setItem(TOKEN_KEY, fakeToken)
-        localStorage.setItem(USER_KEY, JSON.stringify(found))
-        setToken(fakeToken)
-        setUser(found)
-        return
-      }
       const msg =
         err && typeof err === 'object' && 'response' in err
           ? ((err as { response?: { data?: { message?: string } } }).response?.data?.message)
           : undefined
-      throw new Error(msg ?? 'Credenciales incorrectas')
+      throw new Error(msg ?? 'Credenciales incorrectas. Verifica que el servidor esté activo.')
     } finally {
       setIsLoading(false)
     }
@@ -110,26 +99,17 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       try {
         loggedUser = await fetchMe(data.token)
       } catch {
-        loggedUser = { id: 0, nombre: data.nombre, email: data.email, rol: data.rol }
+        loggedUser = { id: 0, nombre: data.nombre, email: data.email, rol: normalizeRol(data.rol) }
       }
       localStorage.setItem(USER_KEY, JSON.stringify(loggedUser))
       setToken(data.token)
       setUser(loggedUser)
     } catch (err: unknown) {
-      if (isNetworkError(err)) {
-        const newUser: User = { id: Date.now(), nombre, email, rol: 'donador' }
-        const fakeToken = btoa(`${newUser.id}:${newUser.email}:${Date.now()}`)
-        localStorage.setItem(TOKEN_KEY, fakeToken)
-        localStorage.setItem(USER_KEY, JSON.stringify(newUser))
-        setToken(fakeToken)
-        setUser(newUser)
-        return
-      }
       const msg =
         err && typeof err === 'object' && 'response' in err
           ? ((err as { response?: { data?: { message?: string } } }).response?.data?.message)
           : undefined
-      throw new Error(msg ?? 'Error al registrar usuario')
+      throw new Error(msg ?? 'Error al registrar usuario. Verifica que el servidor esté activo.')
     } finally {
       setIsLoading(false)
     }

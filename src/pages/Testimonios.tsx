@@ -3,16 +3,35 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { CKEditor } from '@ckeditor/ckeditor5-react'
 import {
   ClassicEditor,
-  Bold,
-  Italic,
-  Link,
+  Bold, Italic, Underline, Strikethrough,
+  Link, AutoLink,
   MediaEmbed,
   Essentials,
   Paragraph,
   Heading,
   BlockQuote,
-  List,
+  List, ListProperties,
+  Alignment,
+  FontSize, FontColor, FontBackgroundColor,
+  Table, TableToolbar, TableCellProperties, TableProperties,
+  HorizontalLine,
+  Indent, IndentBlock,
+  FindAndReplace,
+  RemoveFormat,
+  Code, CodeBlock,
+  SpecialCharacters, SpecialCharactersEssentials,
+  Base64UploadAdapter,
+  ImageBlock, ImageInline,
+  ImageCaption, ImageStyle, ImageToolbar,
+  ImageUpload, ImageInsert,
+  ImageResize,
+  AutoImage,
 } from 'ckeditor5'
+import {
+  SlashCommand,
+  CaseChange,
+  FormatPainter,
+} from 'ckeditor5-premium-features'
 import { useAuth } from '../contexts/AuthContext'
 import TestimonioCard from '../components/ui/TestimonioCard'
 import api from '../lib/axios'
@@ -34,8 +53,10 @@ export default function Testimonios() {
 
   const [titulo, setTitulo] = useState('')
   const [contenido, setContenido] = useState('')
+  const [charCount, setCharCount] = useState(0)
   const [imagenUrl, setImagenUrl] = useState('')
   const [formularioAbierto, setFormularioAbierto] = useState(false)
+  const [guiaAbierta, setGuiaAbierta] = useState(true)
   const [error, setError] = useState('')
 
   const { data: testimonios = [], isLoading } = useQuery({
@@ -58,10 +79,32 @@ export default function Testimonios() {
     },
   })
 
-  function handleSubmit(e: React.FormEvent<HTMLFormElement>) {
+  function handleSubmit(e: { preventDefault(): void }) {
     e.preventDefault()
-    if (!titulo.trim() || !contenido.trim()) {
-      setError('El título y el contenido son obligatorios.')
+    const textoPlano = contenido.replace(/<[^>]*>/g, '').trim()
+    if (titulo.trim().length < 10) {
+      setError('El título debe tener al menos 10 caracteres.')
+      return
+    }
+    if (titulo.trim().length > 100) {
+      setError('El título no puede superar 100 caracteres.')
+      return
+    }
+    if (textoPlano.length < 50) {
+      setError('El contenido debe tener al menos 50 caracteres.')
+      return
+    }
+    if (textoPlano.length > 5000) {
+      setError('El contenido no puede superar 5.000 caracteres.')
+      return
+    }
+    if (imagenUrl.trim() && !/^https:\/\/.+/.test(imagenUrl.trim())) {
+      setError('La URL de imagen debe comenzar con https://')
+      return
+    }
+    const contenidoBytes = new Blob([contenido]).size
+    if (contenidoBytes > 10 * 1024 * 1024) {
+      setError('El contenido es demasiado grande (máx. 10MB). Usa imágenes más pequeñas o en menor cantidad.')
       return
     }
     mutation.mutate({
@@ -107,42 +150,152 @@ export default function Testimonios() {
             onSubmit={handleSubmit}
             className="bg-white rounded-2xl border border-gray-200 shadow-sm p-8 mb-10"
           >
-            <h2 className="text-xl font-bold text-gray-900 mb-6">Nuevo testimonio</h2>
+            <h2 className="text-xl font-bold text-gray-900 mb-5">Nuevo testimonio</h2>
+
+            {/* Guía colapsable */}
+            <div className="mb-6">
+              <button
+                type="button"
+                onClick={() => setGuiaAbierta(!guiaAbierta)}
+                className="w-full flex items-center justify-between bg-blue-50 border border-blue-100 rounded-xl px-4 py-3 text-sm font-semibold text-blue-800 hover:bg-blue-100 transition-colors"
+              >
+                <span>📋 Antes de publicar, revisa estas indicaciones</span>
+                <svg className={`w-4 h-4 transition-transform ${guiaAbierta ? 'rotate-180' : ''}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                </svg>
+              </button>
+              {guiaAbierta && (
+                <ul className="mt-2 bg-blue-50 border border-blue-100 rounded-xl px-5 py-4 space-y-1.5 text-sm text-blue-700 list-disc list-inside">
+                  <li>Tu testimonio debe describir una experiencia real de donación o voluntariado en Donaton</li>
+                  <li>El contenido debe ser apropiado y respetuoso con la comunidad</li>
+                  <li>Puedes subir imágenes desde tu PC arrastrándolas al editor, pegándolas con <strong>Ctrl+V</strong>, o usando el botón de imagen</li>
+                  <li>No incluyas información personal sensible (RUT, dirección exacta, etc.)</li>
+                  <li>Para insertar videos de YouTube o Vimeo, pega la URL directamente en el editor</li>
+                  <li>Mínimo 50 caracteres en el contenido · Máximo 5.000 caracteres</li>
+                </ul>
+              )}
+            </div>
 
             {error && (
-              <div className="bg-red-50 text-red-600 text-sm px-4 py-3 rounded-xl mb-4">
+              <div className="bg-red-50 text-red-600 text-sm px-4 py-3 rounded-xl mb-4 flex items-center gap-2">
+                <svg className="w-4 h-4 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z" />
+                </svg>
                 {error}
               </div>
             )}
 
             <div className="mb-5">
-              <label className="block text-sm font-semibold text-gray-700 mb-2">Título</label>
+              <div className="flex items-center justify-between mb-2">
+                <label className="text-sm font-semibold text-gray-700">Título</label>
+                <span className={`text-xs ${titulo.length > 100 ? 'text-red-500 font-semibold' : titulo.length > 80 ? 'text-amber-500' : 'text-gray-400'}`}>
+                  {titulo.length}/100
+                </span>
+              </div>
               <input
                 type="text"
                 value={titulo}
                 onChange={e => setTitulo(e.target.value)}
+                maxLength={110}
                 placeholder="Ej: Mi experiencia donando ropa este invierno"
-                className="w-full px-4 py-3 rounded-xl border border-gray-200 focus:border-orange-400 focus:ring-2 focus:ring-orange-100 outline-none text-sm transition-colors"
-                required
+                className={`w-full px-4 py-3 rounded-xl border focus:ring-2 focus:ring-orange-100 outline-none text-sm transition-colors ${
+                  titulo.length > 100 ? 'border-red-300 focus:border-red-400' : 'border-gray-200 focus:border-orange-400'
+                }`}
               />
+              {titulo.trim().length > 0 && titulo.trim().length < 10 && (
+                <p className="text-xs text-amber-600 mt-1">Mínimo 10 caracteres</p>
+              )}
             </div>
 
             <div className="mb-5">
               <label className="block text-sm font-semibold text-gray-700 mb-2">Contenido</label>
-              <div className="rounded-xl border border-gray-200 overflow-hidden">
+              <div className={`rounded-xl border overflow-hidden ${charCount > 5000 ? 'border-red-300' : 'border-gray-200'}`}>
                 <CKEditor
                   editor={ClassicEditor}
                   config={{
-                    licenseKey: 'GPL',
-                    plugins: [Essentials, Bold, Italic, Link, MediaEmbed, Paragraph, Heading, BlockQuote, List],
+                    licenseKey: 'eyJhbGciOiJFUzI1NiJ9.eyJleHAiOjE3ODI4NjM5OTksImp0aSI6ImIxZGRmZGJhLWE1OWItNGZlZS1hODFjLTFhZTU5MzYxZTU4MSIsInVzYWdlRW5kcG9pbnQiOiJodHRwczovL3Byb3h5LWV2ZW50LmNrZWRpdG9yLmNvbSIsImRpc3RyaWJ1dGlvbkNoYW5uZWwiOlsiY2xvdWQiLCJkcnVwYWwiLCJzaCJdLCJ3aGl0ZUxhYmVsIjp0cnVlLCJsaWNlbnNlVHlwZSI6InRyaWFsIiwiZmVhdHVyZXMiOlsiKiJdLCJ2YyI6IjVkNTE1YjBmIn0.a83BRWDSBnX-R0Ipsq5UzHjuZreYUNsnbdlr8RtzYguJjUVMu8ipLcbSSiYNV1XS0sK2bWFd3Amhuh3Auekoqw',
+                    plugins: [
+                      Essentials, Paragraph, Heading,
+                      Bold, Italic, Underline, Strikethrough, Code, RemoveFormat,
+                      Link, AutoLink,
+                      List, ListProperties,
+                      Alignment,
+                      FontSize, FontColor, FontBackgroundColor,
+                      BlockQuote, CodeBlock,
+                      Table, TableToolbar, TableCellProperties, TableProperties,
+                      HorizontalLine,
+                      Indent, IndentBlock,
+                      FindAndReplace,
+                      MediaEmbed,
+                      SpecialCharacters, SpecialCharactersEssentials,
+                      Base64UploadAdapter,
+                      ImageBlock, ImageInline,
+                      ImageCaption, ImageStyle, ImageToolbar,
+                      ImageUpload, ImageInsert,
+                      ImageResize,
+                      AutoImage,
+                      SlashCommand, CaseChange, FormatPainter,
+                    ],
                     toolbar: {
-                      items: ['heading', '|', 'bold', 'italic', 'link', '|', 'bulletedList', 'numberedList', '|', 'blockQuote', 'mediaEmbed'],
+                      items: [
+                        'heading', '|',
+                        'bold', 'italic', 'underline', 'strikethrough', 'code', 'removeFormat', '|',
+                        'fontSize', 'fontColor', 'fontBackgroundColor', '|',
+                        'alignment', '|',
+                        'bulletedList', 'numberedList', 'outdent', 'indent', '|',
+                        'insertImage', 'link', 'blockQuote', 'insertTable', 'mediaEmbed', 'horizontalLine', 'specialCharacters', '|',
+                        'codeBlock', '|',
+                        'findAndReplace', 'caseChange', 'formatPainter',
+                      ],
+                      shouldNotGroupWhenFull: true,
                     },
-                    placeholder: 'Cuenta tu historia aquí. Puedes pegar enlaces de YouTube o Vimeo para insertar videos.',
+                    list: {
+                      properties: { styles: true, startIndex: true, reversed: true },
+                    },
+                    table: {
+                      contentToolbar: ['tableColumn', 'tableRow', 'mergeTableCells', 'tableCellProperties', 'tableProperties'],
+                    },
+                    image: {
+                      toolbar: [
+                        'imageStyle:inline', 'imageStyle:block', 'imageStyle:side', '|',
+                        'toggleImageCaption', 'imageTextAlternative', '|',
+                        'resizeImage',
+                      ],
+                      insert: {
+                        integrations: ['upload', 'url'],
+                      },
+                      resizeUnit: '%',
+                      resizeOptions: [
+                        { name: 'resizeImage:original', value: null, label: 'Original' },
+                        { name: 'resizeImage:25', value: '25', label: '25%' },
+                        { name: 'resizeImage:50', value: '50', label: '50%' },
+                        { name: 'resizeImage:75', value: '75', label: '75%' },
+                      ],
+                    },
+                    fontSize: {
+                      options: [10, 12, 'default', 16, 18, 20, 24],
+                    },
+                    mediaEmbed: {
+                      previewsInData: true,
+                    },
+                    placeholder: 'Cuenta tu historia aquí. Escribe "/" para ver comandos o arrastra una imagen.',
                   }}
                   data={contenido}
-                  onChange={(_, editor) => setContenido(editor.getData())}
+                  onChange={(_, editor) => {
+                    const html = editor.getData()
+                    const texto = html.replace(/<[^>]*>/g, '').trim()
+                    setContenido(html)
+                    setCharCount(texto.length)
+                  }}
                 />
+              </div>
+              <div className="flex items-center justify-between mt-1">
+                {charCount > 0 && charCount < 50 ? (
+                  <p className="text-xs text-amber-600">Mínimo 50 caracteres</p>
+                ) : <span />}
+                <p className={`text-xs ml-auto ${charCount > 5000 ? 'text-red-500 font-semibold' : charCount > 4000 ? 'text-amber-500' : 'text-gray-400'}`}>
+                  {charCount.toLocaleString('es-CL')} / 5.000
+                </p>
               </div>
             </div>
 
@@ -151,12 +304,18 @@ export default function Testimonios() {
                 URL de imagen de portada <span className="font-normal text-gray-400">(opcional)</span>
               </label>
               <input
-                type="url"
+                type="text"
                 value={imagenUrl}
                 onChange={e => setImagenUrl(e.target.value)}
-                placeholder="https://..."
-                className="w-full px-4 py-3 rounded-xl border border-gray-200 focus:border-orange-400 focus:ring-2 focus:ring-orange-100 outline-none text-sm transition-colors"
+                placeholder="https://i.imgur.com/ejemplo.jpg"
+                className={`w-full px-4 py-3 rounded-xl border focus:ring-2 focus:ring-orange-100 outline-none text-sm transition-colors ${
+                  imagenUrl && !/^https:\/\/.+/.test(imagenUrl) ? 'border-red-300 focus:border-red-400' : 'border-gray-200 focus:border-orange-400'
+                }`}
               />
+              {imagenUrl && !/^https:\/\/.+/.test(imagenUrl) && (
+                <p className="text-xs text-red-500 mt-1">La URL debe comenzar con https://</p>
+              )}
+              <p className="text-xs text-gray-400 mt-1">Usa una URL de imagen pública (Imgur, Google Photos, etc.)</p>
             </div>
 
             <div className="flex items-center justify-between">
@@ -166,7 +325,7 @@ export default function Testimonios() {
               <div className="flex gap-3">
                 <button
                   type="button"
-                  onClick={() => { setFormularioAbierto(false); setError('') }}
+                  onClick={() => { setFormularioAbierto(false); setError(''); setGuiaAbierta(true) }}
                   className="px-5 py-2.5 text-sm font-medium text-gray-600 hover:text-gray-900 transition-colors"
                 >
                   Cancelar

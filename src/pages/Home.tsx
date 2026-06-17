@@ -219,6 +219,29 @@ export default function Home() {
         </div>
       </section>
 
+      {/* ══════ CAUSA URGENTE ══════ */}
+      {(() => {
+        const urgente = causasActivas.find(c => c.destacada)
+        if (!urgente) return null
+        return (
+          <section className="bg-red-50 border-y border-red-100 py-5">
+            <div className="max-w-6xl mx-auto px-6 flex flex-col sm:flex-row items-center gap-4 sm:gap-6">
+              <span className="flex-shrink-0 inline-flex items-center gap-2 bg-red-500 text-white text-xs font-bold px-3 py-1.5 rounded-full uppercase tracking-wide">
+                <span className="w-1.5 h-1.5 rounded-full bg-white animate-ping" />
+                🚨 Urgente
+              </span>
+              <div className="flex-1 min-w-0 text-center sm:text-left">
+                <p className="font-black text-gray-900 text-base sm:text-lg truncate">{urgente.titulo}</p>
+                <p className="text-gray-600 text-sm line-clamp-1">{urgente.descripcion}</p>
+              </div>
+              <Link to="/donaciones" className="flex-shrink-0 bg-red-500 hover:bg-red-600 text-white font-bold text-sm px-6 py-3 rounded-full transition-colors shadow-md">
+                Colaborar ahora
+              </Link>
+            </div>
+          </section>
+        )
+      })()}
+
       {/* ══════ CAUSAS ACTIVAS ══════ */}
       <section id="causas" className="py-20 bg-gray-50">
         <div className="max-w-6xl mx-auto px-6">
@@ -322,11 +345,11 @@ export default function Home() {
                 <div className="flex gap-4 flex-wrap">
                   {mockImpactoRegion.slice(0, 5).map(r => (
                     <div key={r.id} className="flex items-center gap-2">
-                      <div className={`w-8 h-8 rounded-lg flex items-center justify-center text-xs font-bold text-white ${
+                      <div className={`w-2 h-2 rounded-full flex-shrink-0 ${
                         r.nivel >= 5 ? 'bg-orange-500' : r.nivel >= 3 ? 'bg-orange-400' : 'bg-orange-300'
-                      }`}>{r.codigo}</div>
+                      }`} />
                       <div>
-                        <p className="text-white text-xs font-medium">{r.nombre}</p>
+                        <p className="text-white text-xs font-bold">{r.nombre}</p>
                         <p className="text-gray-400 text-xs">{r.kilosRopa.toLocaleString('es-CL')} kg</p>
                       </div>
                     </div>
@@ -336,11 +359,15 @@ export default function Home() {
             </div>
           </div>
 
-          <div className="mt-8">
+          <div className="mt-8 flex flex-wrap gap-4">
             <a href="#donde-donar" className="inline-flex items-center gap-2 bg-orange-500 hover:bg-orange-600 text-white font-bold px-8 py-4 rounded-full transition-colors shadow-lg">
               Ver centros de acopio
               <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 8l4 4m0 0l-4 4m4-4H3" /></svg>
             </a>
+            <Link to="/campanas" className="inline-flex items-center gap-2 bg-white/10 hover:bg-white/20 border border-white/20 text-white font-bold px-8 py-4 rounded-full transition-colors">
+              Ver todas las campañas
+              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" /></svg>
+            </Link>
           </div>
         </div>
       </section>

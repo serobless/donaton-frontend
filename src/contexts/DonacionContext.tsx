@@ -16,6 +16,8 @@ interface BackendCausa {
   diasRestantes?: number
   descripcion?: string
   fechaFin?: string
+  destacada?: boolean
+  urgencia?: string
 }
 
 interface PortadaResponse {
@@ -61,6 +63,8 @@ function mapCausa(b: BackendCausa): Causa {
     activa: b.activa,
     fechaFin,
     diasRestantes,
+    destacada: b.destacada ?? false,
+    urgencia: b.urgencia,
   }
 }
 

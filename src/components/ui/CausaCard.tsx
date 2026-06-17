@@ -11,6 +11,7 @@ const categoryConfig: Record<string, { bg: string; text: string }> = {
   Alimentación: { bg: 'bg-emerald-100', text: 'text-emerald-700' },
   Salud:        { bg: 'bg-rose-100',    text: 'text-rose-700'    },
   Animales:     { bg: 'bg-amber-100',   text: 'text-amber-700'   },
+  Emergencia:   { bg: 'bg-red-100',     text: 'text-red-700'     },
 }
 
 export default function CausaCard({ causa }: Props) {

@@ -26,6 +26,23 @@ export interface Causa {
   activa: boolean
   fechaFin: string
   diasRestantes?: number
+  destacada?: boolean
+  urgencia?: string
+}
+
+export interface Campana {
+  id: number
+  titulo: string
+  descripcion: string
+  imagen: string
+  tipo: string
+  estado: 'activa' | 'proxima' | 'finalizada'
+  metaUnidades: number
+  unidadesActuales: number
+  unidadNombre: string
+  fechaInicio: string
+  fechaFin: string
+  regiones: string[]
 }
 
 export type EstadoDonacion = 'pendiente' | 'en_proceso' | 'completada' | 'cancelada'
