@@ -1,11 +1,12 @@
 import { Navigate, Outlet } from 'react-router-dom'
 import { useAuth } from '../../contexts/AuthContext'
+import type { User } from '../../types'
 
 interface Props {
-  requiredRole?: 'admin' | 'donador'
+  allowedRoles?: Array<User['rol']>
 }
 
-export default function ProtectedRoute({ requiredRole }: Props) {
+export default function ProtectedRoute({ allowedRoles }: Props) {
   const { isAuthenticated, user, isLoading } = useAuth()
 
   if (isLoading) return null
@@ -14,7 +15,7 @@ export default function ProtectedRoute({ requiredRole }: Props) {
     return <Navigate to="/login" replace />
   }
 
-  if (requiredRole && user?.rol?.toLowerCase() !== requiredRole) {
+  if (allowedRoles && user?.rol && !allowedRoles.includes(user.rol)) {
     return <Navigate to="/" replace />
   }
 

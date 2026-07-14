@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
+import { useQuery, useMutation } from '@tanstack/react-query'
 import { CKEditor } from '@ckeditor/ckeditor5-react'
 import {
   ClassicEditor,
@@ -49,7 +49,6 @@ async function crearTestimonio(req: TestimonioRequest): Promise<Testimonio> {
 
 export default function Testimonios() {
   const { isAuthenticated, user } = useAuth()
-  const queryClient = useQueryClient()
 
   const [titulo, setTitulo] = useState('')
   const [contenido, setContenido] = useState('')
@@ -58,6 +57,7 @@ export default function Testimonios() {
   const [formularioAbierto, setFormularioAbierto] = useState(false)
   const [guiaAbierta, setGuiaAbierta] = useState(true)
   const [error, setError] = useState('')
+  const [pendienteAprobacion, setPendienteAprobacion] = useState(false)
 
   const { data: testimonios = [], isLoading } = useQuery({
     queryKey: ['testimonios'],
@@ -67,12 +67,12 @@ export default function Testimonios() {
   const mutation = useMutation({
     mutationFn: crearTestimonio,
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['testimonios'] })
       setTitulo('')
       setContenido('')
       setImagenUrl('')
       setFormularioAbierto(false)
       setError('')
+      setPendienteAprobacion(true)
     },
     onError: () => {
       setError('No se pudo publicar el testimonio. Intenta nuevamente.')
@@ -213,7 +213,7 @@ export default function Testimonios() {
                 <CKEditor
                   editor={ClassicEditor}
                   config={{
-                    licenseKey: 'eyJhbGciOiJFUzI1NiJ9.eyJleHAiOjE3ODI4NjM5OTksImp0aSI6ImIxZGRmZGJhLWE1OWItNGZlZS1hODFjLTFhZTU5MzYxZTU4MSIsInVzYWdlRW5kcG9pbnQiOiJodHRwczovL3Byb3h5LWV2ZW50LmNrZWRpdG9yLmNvbSIsImRpc3RyaWJ1dGlvbkNoYW5uZWwiOlsiY2xvdWQiLCJkcnVwYWwiLCJzaCJdLCJ3aGl0ZUxhYmVsIjp0cnVlLCJsaWNlbnNlVHlwZSI6InRyaWFsIiwiZmVhdHVyZXMiOlsiKiJdLCJ2YyI6IjVkNTE1YjBmIn0.a83BRWDSBnX-R0Ipsq5UzHjuZreYUNsnbdlr8RtzYguJjUVMu8ipLcbSSiYNV1XS0sK2bWFd3Amhuh3Auekoqw',
+                    licenseKey: 'eyJhbGciOiJFUzI1NiJ9.eyJleHAiOjE3ODUxOTY3OTksImp0aSI6IjA4Y2IyNWY5LTFmOTQtNDlhNi04ODkyLWQwNTI2MGMzYjJkYyIsInVzYWdlRW5kcG9pbnQiOiJodHRwczovL3Byb3h5LWV2ZW50LmNrZWRpdG9yLmNvbSIsImRpc3RyaWJ1dGlvbkNoYW5uZWwiOlsiY2xvdWQiLCJkcnVwYWwiLCJzaCJdLCJ3aGl0ZUxhYmVsIjp0cnVlLCJsaWNlbnNlVHlwZSI6InRyaWFsIiwiZmVhdHVyZXMiOlsiKiJdLCJ2YyI6ImJkNGMyNjUwIn0.u2SqPEXgN0wqTks6e-xe4U2AizDqvo6-uUtzc8G8-8nSv9kMHPxMEaLMMKTIpw84c_3WXQqKFAxwKERVKVYnjQ',
                     plugins: [
                       Essentials, Paragraph, Heading,
                       Bold, Italic, Underline, Strikethrough, Code, RemoveFormat,
@@ -340,6 +340,20 @@ export default function Testimonios() {
               </div>
             </div>
           </form>
+        )}
+
+        {/* Banner: testimonio pendiente de aprobación */}
+        {pendienteAprobacion && (
+          <div className="mb-8 bg-blue-50 border border-blue-200 text-blue-800 px-5 py-4 rounded-xl flex items-start gap-3">
+            <svg className="w-5 h-5 text-blue-500 flex-shrink-0 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+            </svg>
+            <div>
+              <p className="font-semibold">Testimonio enviado</p>
+              <p className="text-sm mt-0.5">Tu testimonio está pendiente de aprobación por un administrador. Aparecerá en esta página una vez que sea revisado.</p>
+            </div>
+            <button onClick={() => setPendienteAprobacion(false)} className="ml-auto text-blue-400 hover:text-blue-600 text-lg leading-none flex-shrink-0">✕</button>
+          </div>
         )}
 
         {/* Lista de testimonios */}

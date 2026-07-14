@@ -24,15 +24,21 @@ interface BackendAuthResponse {
   rol: string  // backend envía "ADMIN" o "DONANTE" (enum Java)
 }
 
-function normalizeRol(rol: string): 'admin' | 'donador' {
-  return rol.toUpperCase() === 'ADMIN' ? 'admin' : 'donador'
+function normalizeRol(rol: string): 'admin' | 'donador' | 'empresa' | 'centro_admin' {
+  const r = rol.toUpperCase()
+  if (r === 'ADMIN') return 'admin'
+  if (r === 'EMPRESA') return 'empresa'
+  if (r === 'CENTRO_ADMIN') return 'centro_admin'
+  return 'donador'
 }
 
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<User | null>(() => {
     const stored = localStorage.getItem(USER_KEY)
     try {
-      return stored ? JSON.parse(stored) : null
+      if (!stored) return null
+      const parsed = JSON.parse(stored) as User
+      return { ...parsed, rol: normalizeRol(parsed.rol as string) }
     } catch {
       localStorage.removeItem(USER_KEY)
       return null
@@ -59,10 +65,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, [])
 
   async function fetchMe(tok: string): Promise<User> {
-    const { data } = await api.get<User>('/auth/me', {
+    const { data } = await api.get<User & { rol: string }>('/auth/me', {
       headers: { Authorization: `Bearer ${tok}` },
     })
-    return data
+    return { ...data, rol: normalizeRol(data.rol) }
   }
 
   async function login({ email, password }: LoginCredentials) {
@@ -80,20 +86,30 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       setToken(data.token)
       setUser(loggedUser)
     } catch (err: unknown) {
-      const msg =
-        err && typeof err === 'object' && 'response' in err
-          ? ((err as { response?: { data?: { message?: string } } }).response?.data?.message)
-          : undefined
-      throw new Error(msg ?? 'Credenciales incorrectas. Verifica que el servidor esté activo.')
+      const axiosErr = err as { response?: { status?: number; data?: { message?: string } } }
+      let msg: string
+      if (!axiosErr.response) {
+        msg = 'No se pudo conectar con el servidor. Verifica que ms-auth esté corriendo en el puerto 8083.'
+      } else if (axiosErr.response.status === 401 || axiosErr.response.status === 403) {
+        msg = axiosErr.response.data?.message ?? 'Correo o contraseña incorrectos.'
+      } else {
+        msg = axiosErr.response.data?.message ?? `Error ${axiosErr.response.status} al iniciar sesión.`
+      }
+      throw new Error(msg)
     } finally {
       setIsLoading(false)
     }
   }
 
-  async function register({ nombre, email, password, rut, telefono, region }: RegisterData) {
+  async function register({ nombre, email, password, rut, telefono, region, esEmpresa, nombreEmpresa, rutEmpresa }: RegisterData) {
     setIsLoading(true)
     try {
-      const { data } = await api.post<BackendAuthResponse>('/auth/register', { nombre, email, password, rut, telefono, region })
+      const { data } = await api.post<BackendAuthResponse>('/auth/register', {
+        nombre, email, password, rut, telefono, region,
+        esEmpresa: esEmpresa ?? false,
+        nombreEmpresa: esEmpresa ? nombreEmpresa : undefined,
+        rutEmpresa: esEmpresa ? rutEmpresa : undefined,
+      })
       localStorage.setItem(TOKEN_KEY, data.token)
       let loggedUser: User
       try {
@@ -105,11 +121,19 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       setToken(data.token)
       setUser(loggedUser)
     } catch (err: unknown) {
-      const msg =
-        err && typeof err === 'object' && 'response' in err
-          ? ((err as { response?: { data?: { message?: string } } }).response?.data?.message)
-          : undefined
-      throw new Error(msg ?? 'Error al registrar usuario. Verifica que el servidor esté activo.')
+      const axiosErr = err as { response?: { status?: number; data?: { message?: string } }; code?: string }
+      let msg: string
+      if (!axiosErr.response) {
+        // Sin respuesta: servidor caído o red
+        msg = 'No se pudo conectar con el servidor. Verifica que ms-auth esté corriendo en el puerto 8083.'
+      } else if (axiosErr.response.status === 400) {
+        msg = axiosErr.response.data?.message ?? 'Datos inválidos. Revisa los campos e intenta nuevamente.'
+      } else if (axiosErr.response.status === 409) {
+        msg = axiosErr.response.data?.message ?? 'Ya existe una cuenta con este correo o RUT.'
+      } else {
+        msg = axiosErr.response.data?.message ?? `Error ${axiosErr.response.status} al registrar usuario.`
+      }
+      throw new Error(msg)
     } finally {
       setIsLoading(false)
     }

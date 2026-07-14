@@ -4,7 +4,7 @@ import { useDonacion } from '../contexts/DonacionContext'
 import CausaCard from '../components/ui/CausaCard'
 import MapaCentros from '../components/ui/MapaCentros'
 import { useCountUp } from '../lib/useCountUp'
-import { mockCentrosAcopio, mockImpactoRegion, mockPartners } from '../lib/mockData'
+import { mockImpactoRegion, mockPartners } from '../lib/mockData'
 import api from '../lib/axios'
 import type { CentroAcopio, Necesidad } from '../types'
 
@@ -113,13 +113,12 @@ export default function Home() {
   const [enviandoVol, setEnviandoVol] = useState(false)
   const [exitoVol, setExitoVol] = useState(false)
 
-  // Centros — carga desde API con fallback a mock
-  const [centros, setCentros] = useState<CentroAcopio[]>(mockCentrosAcopio)
+  const [centros, setCentros] = useState<CentroAcopio[]>([])
   const [necesidades, setNecesidades] = useState<Necesidad[]>([])
   useEffect(() => {
     api.get<CentroAcopio[]>('/api/centros')
-      .then(({ data }) => { if (data.length > 0) setCentros(data) })
-      .catch(() => { /* usa mock como fallback */ })
+      .then(({ data }) => setCentros(data))
+      .catch(() => { /* sin centros disponibles */ })
     api.get<Necesidad[]>('/api/necesidades')
       .then(({ data }) => { if (data.length > 0) setNecesidades(data) })
       .catch(() => { /* sin necesidades del backend, no mostramos badges */ })

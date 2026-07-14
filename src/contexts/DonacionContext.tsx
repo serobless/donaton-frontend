@@ -1,6 +1,5 @@
 import { createContext, useContext, useEffect, useState, type ReactNode } from 'react'
 import type { Causa, TopDonador } from '../types'
-import { mockCausas, mockDonaciones, mockTopDonadores } from '../lib/mockData'
 import api from '../lib/axios'
 
 // Causa directa desde ms-donaciones /api/causas
@@ -90,7 +89,7 @@ export function DonacionProvider({ children }: { children: ReactNode }) {
         const { data: causasData } = await api.get<BackendCausa[]>('/api/causas')
         setCausas(causasData.map(mapCausa))
       } catch {
-        setCausas(mockCausas)
+        setCausas([])
       }
 
       try {
@@ -101,9 +100,7 @@ export function DonacionProvider({ children }: { children: ReactNode }) {
         setTotalRecaudado(rec)
         setTotalDonaciones(don)
       } catch {
-        setTopDonadores(mockTopDonadores)
-        setTotalRecaudado(mockDonaciones.reduce((s, d) => s + d.monto, 0))
-        setTotalDonaciones(mockDonaciones.length)
+        setTopDonadores([])
       } finally {
         setIsLoading(false)
       }

@@ -1,13 +1,9 @@
 import { useEffect, useState } from 'react'
+import MapPicker from '../components/ui/MapPicker'
 import { useAuth } from '../contexts/AuthContext'
 import ProgressBar from '../components/ui/ProgressBar'
 import type { Causa, DonacionExtendida, TopDonador, User, CentroAcopio, EstadoDonacion, TipoDonacion } from '../types'
-import {
-  mockCausas,
-  mockDonaciones,
-  mockTopDonadores,
-  mockChartData,
-} from '../lib/mockData'
+import { mockChartData } from '../lib/mockData'
 import api from '../lib/axios'
 import {
   BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer,
@@ -30,33 +26,6 @@ interface BffTopDonador {
   cantidadDonaciones?: number
 }
 
-const CIUDADES_CHILE = [
-  { ciudad: 'Santiago',      region: 'Metropolitana', lat: -33.4489, lng: -70.6693 },
-  { ciudad: 'Puente Alto',   region: 'Metropolitana', lat: -33.6116, lng: -70.5757 },
-  { ciudad: 'Maipú',         region: 'Metropolitana', lat: -33.5123, lng: -70.7601 },
-  { ciudad: 'La Florida',    region: 'Metropolitana', lat: -33.5205, lng: -70.5990 },
-  { ciudad: 'Valparaíso',    region: 'Valparaíso',    lat: -33.0472, lng: -71.6127 },
-  { ciudad: 'Viña del Mar',  region: 'Valparaíso',    lat: -33.0245, lng: -71.5518 },
-  { ciudad: 'Quilpué',       region: 'Valparaíso',    lat: -33.0499, lng: -71.4415 },
-  { ciudad: 'Concepción',    region: 'Biobío',        lat: -36.8201, lng: -73.0444 },
-  { ciudad: 'Talcahuano',    region: 'Biobío',        lat: -36.7246, lng: -73.1171 },
-  { ciudad: 'Los Ángeles',   region: 'Biobío',        lat: -37.4720, lng: -72.3540 },
-  { ciudad: 'Temuco',        region: 'Araucanía',     lat: -38.7359, lng: -72.5904 },
-  { ciudad: 'Padre Las Casas', region: 'Araucanía',   lat: -38.7714, lng: -72.5750 },
-  { ciudad: 'Talca',         region: 'Maule',         lat: -35.4264, lng: -71.6554 },
-  { ciudad: 'Curicó',        region: 'Maule',         lat: -34.9824, lng: -71.2389 },
-  { ciudad: 'La Serena',     region: 'Coquimbo',      lat: -29.9027, lng: -71.2520 },
-  { ciudad: 'Coquimbo',      region: 'Coquimbo',      lat: -29.9533, lng: -71.3436 },
-  { ciudad: 'Antofagasta',   region: 'Antofagasta',   lat: -23.6509, lng: -70.3975 },
-  { ciudad: 'Iquique',       region: 'Tarapacá',      lat: -20.2208, lng: -70.1431 },
-  { ciudad: 'Arica',         region: 'Arica y Parinacota', lat: -18.4783, lng: -70.3126 },
-  { ciudad: 'Puerto Montt',  region: 'Los Lagos',     lat: -41.4717, lng: -72.9370 },
-  { ciudad: 'Osorno',        region: 'Los Lagos',     lat: -40.5738, lng: -73.1336 },
-  { ciudad: 'Valdivia',      region: 'Los Ríos',      lat: -39.8142, lng: -73.2459 },
-  { ciudad: 'Rancagua',      region: "O'Higgins",     lat: -34.1703, lng: -70.7444 },
-  { ciudad: 'Copiapó',       region: 'Atacama',       lat: -27.3669, lng: -70.3323 },
-  { ciudad: 'Punta Arenas',  region: 'Magallanes',    lat: -53.1638, lng: -70.9171 },
-]
 
 interface ApiCausa {
   id: number
@@ -70,6 +39,10 @@ interface ApiCausa {
   diasRestantes?: number
   destacada?: boolean
   urgencia?: string
+  fechaInicio?: string
+  fechaFin?: string
+  centro?: { id: number; nombre: string }
+  tipo?: string
 }
 
 interface BackendUsuario {
@@ -78,6 +51,7 @@ interface BackendUsuario {
   email: string
   rol: string
   fechaRegistro?: string
+  centroId?: number
 }
 
 interface DashboardResponse {
@@ -100,21 +74,27 @@ interface BackendDonacion {
   centroAcopio?: { id: number; nombre: string } | null
   estado?: string | null
   descripcion?: string | null
+  esEmpresa?: boolean
+  nombreEmpresa?: string | null
+  requiereAprobacion?: boolean
 }
 
 function mapBackendDonacion(b: BackendDonacion): DonacionExtendida {
   return {
     id: b.id,
-    donadorNombre: b.donanteAlias ?? 'Anónimo',
+    donadorNombre: b.nombreEmpresa ?? b.donanteAlias ?? 'Anónimo',
     monto: b.monto,
     causaId: b.causa.id,
     causaTitulo: b.causa.titulo,
     centroNombre: b.centroAcopio?.nombre,
     fecha: b.fecha,
     anonima: b.donanteAlias === null,
-    estado: (b.estado ?? 'pendiente') as EstadoDonacion,
+    estado: ((b.estado ?? 'pendiente').toLowerCase()) as EstadoDonacion,
     tipo: b.tipoDonacion.toLowerCase() as TipoDonacion,
     descripcion: b.descripcion ?? undefined,
+    esEmpresa: b.esEmpresa ?? false,
+    nombreEmpresa: b.nombreEmpresa ?? undefined,
+    requiereAprobacion: b.requiereAprobacion ?? false,
   }
 }
 
@@ -137,21 +117,28 @@ function mapApiCausa(c: ApiCausa): Causa {
     recaudado: c.recaudado,
     categoria: c.categoria,
     activa: c.activa,
-    fechaFin: '',
+    fechaFin: c.fechaFin ?? '',
+    fechaInicio: c.fechaInicio,
     diasRestantes: c.diasRestantes,
     destacada: c.destacada,
     urgencia: c.urgencia,
+    centroId: c.centro?.id,
+    centroNombre: c.centro?.nombre,
+    tipo: c.tipo,
   }
 }
 
 function mapBackendUsuario(u: BackendUsuario): User {
-  return {
-    id: u.id,
-    nombre: u.nombre,
-    email: u.email,
-    rol: u.rol.toUpperCase() === 'ADMIN' ? 'admin' : 'donador',
-    fechaRegistro: u.fechaRegistro,
-  }
+  const r = u.rol.toUpperCase()
+  const rol: User['rol'] = r === 'ADMIN' ? 'admin' : r === 'EMPRESA' ? 'empresa' : r === 'CENTRO_ADMIN' ? 'centro_admin' : 'donador'
+  return { id: u.id, nombre: u.nombre, email: u.email, rol, fechaRegistro: u.fechaRegistro, centroId: u.centroId }
+}
+
+interface TestimonioPendiente {
+  id: number
+  titulo: string
+  autorNombre: string
+  fechaCreacion: string
 }
 
 function formatDate(fecha: unknown): string {
@@ -165,7 +152,12 @@ function formatDate(fecha: unknown): string {
   return isNaN(d.getTime()) ? '—' : d.toLocaleDateString('es-CL')
 }
 
-type Tab = 'resumen' | 'donaciones' | 'causas' | 'usuarios' | 'centros'
+type Tab = 'resumen' | 'donaciones' | 'causas' | 'usuarios' | 'centros' | 'testimonios' | 'mi-centro'
+
+const NECESIDAD_EMOJI: Record<string, string> = {
+  Frazadas: '🧣', Ropa: '👕', Alimentos: '🥫', Medicamentos: '💊',
+}
+const NECESIDAD_TIPOS = ['Frazadas', 'Ropa', 'Alimentos', 'Medicamentos']
 
 const ESTADO_LABEL: Record<EstadoDonacion, string> = {
   pendiente: 'Pendiente',
@@ -232,7 +224,7 @@ function ConfirmModal({ message, onConfirm, onCancel }: { message: string; onCon
 
 export default function Dashboard() {
   const { user, token } = useAuth()
-  const [tab, setTab] = useState<Tab>('resumen')
+  const [tab, setTab] = useState<Tab>(() => user?.rol === 'centro_admin' ? 'mi-centro' : 'resumen')
   const [causas, setCausas] = useState<Causa[]>([])
   const [donaciones, setDonaciones] = useState<DonacionExtendida[]>([])
   const [topDonadores, setTopDonadores] = useState<TopDonador[]>([])
@@ -240,6 +232,8 @@ export default function Dashboard() {
   const [centros, setCentros] = useState<CentroAcopio[]>([])
   const [totalRecaudado, setTotalRecaudado] = useState(0)
   const [isLoading, setIsLoading] = useState(true)
+  const [testimoniosPendientes, setTestimoniosPendientes] = useState<TestimonioPendiente[]>([])
+  const [cambiandoRolId, setCambiandoRolId] = useState<number | null>(null)
 
   // Filtros donaciones
   const [filtroEstado, setFiltroEstado] = useState<string>('todos')
@@ -258,11 +252,25 @@ export default function Dashboard() {
   const [causaEliminar, setCausaEliminar] = useState<Causa | null>(null)
   const [showNuevaCausa, setShowNuevaCausa] = useState(false)
 
+  // Mi Centro — necesidades
+  const [miCentroNeeds, setMiCentroNeeds] = useState<import('../types').Necesidad[]>([])
+  const [needEditar, setNeedEditar] = useState<import('../types').Necesidad | null>(null)
+  const [needEliminar, setNeedEliminar] = useState<import('../types').Necesidad | null>(null)
+  const [showNuevaNeed, setShowNuevaNeed] = useState(false)
+
   // Modal centros
   const [centroEditar, setCentroEditar] = useState<CentroAcopio | null>(null)
+  const [centroEditarError, setCentroEditarError] = useState('')
   const [showNuevoCentro, setShowNuevoCentro] = useState(false)
+  const [nuevoCentroError, setNuevoCentroError] = useState('')
   const [nuevoCentroLat, setNuevoCentroLat] = useState('')
   const [nuevoCentroLng, setNuevoCentroLng] = useState('')
+  const [nuevoCentroDireccion, setNuevoCentroDireccion] = useState('')
+  const [nuevoCiudadSeleccionada, setNuevoCiudadSeleccionada] = useState('')
+  const [nuevoCentroRegion, setNuevoCentroRegion] = useState('')
+  const [geoMensaje, setGeoMensaje] = useState('')
+  const [guardandoCentro, setGuardandoCentro] = useState(false)
+  const [mostrarMapaPicker, setMostrarMapaPicker] = useState(false)
   const [horarioDias, setHorarioDias] = useState('Lun-Vie')
   const [horarioAbre, setHorarioAbre] = useState('09:00')
   const [horarioCierra, setHorarioCierra] = useState('18:00')
@@ -273,24 +281,34 @@ export default function Dashboard() {
       return
     }
     async function fetchDashboard() {
+      let donacionesRaw: BackendDonacion[] = []
+
+      // Causas reales — nunca caen a mock
       try {
-        const [{ data }, { data: causasRaw }, { data: donacionesRaw }] = await Promise.all([
-          api.get<DashboardResponse>('/bff/dashboard'),
-          api.get<ApiCausa[]>('/api/causas'),
-          api.get<BackendDonacion[]>('/api/donaciones'),
-        ])
+        const { data: causasRaw } = await api.get<ApiCausa[]>('/api/causas')
         setCausas(causasRaw.map(mapApiCausa))
-        setDonaciones(donacionesRaw.map(mapBackendDonacion))
+      } catch { /* lista vacía */ }
+
+      // Donaciones reales
+      try {
+        const { data } = await api.get<BackendDonacion[]>('/api/donaciones')
+        donacionesRaw = data
+        setDonaciones(data.map(mapBackendDonacion))
+      } catch { /* lista vacía */ }
+
+      // BFF es opcional — si falla calculamos desde datos reales
+      try {
+        const { data } = await api.get<DashboardResponse>('/bff/dashboard')
         setTopDonadores((data.topDonadores ?? []).map(mapBffTopDonador))
         setTotalRecaudado(data.totalDonado ?? 0)
       } catch {
-        setCausas(mockCausas)
-        setDonaciones(mockDonaciones)
-        setTopDonadores(mockTopDonadores)
-        setTotalRecaudado(mockDonaciones.reduce((s, d) => s + d.monto, 0))
-      } finally {
-        setIsLoading(false)
+        const totalLocal = donacionesRaw
+          .filter(d => d.tipoDonacion === 'MONETARIA')
+          .reduce((s, d) => s + (d.monto ?? 0), 0)
+        setTotalRecaudado(totalLocal)
       }
+
+      setIsLoading(false)
     }
     fetchDashboard()
   }, [token])
@@ -304,7 +322,17 @@ export default function Dashboard() {
     api.get<CentroAcopio[]>('/api/centros')
       .then(({ data }) => setCentros(data))
       .catch(() => { /* centros no disponibles */ })
+    api.get<TestimonioPendiente[]>('/api/testimonios/pendientes')
+      .then(({ data }) => setTestimoniosPendientes(data))
+      .catch(() => { /* no disponibles o no es admin */ })
   }, [token])
+
+  useEffect(() => {
+    if (!token || !user?.centroId) return
+    api.get<import('../types').Necesidad[]>(`/api/centros/${user.centroId}/necesidades`)
+      .then(({ data }) => setMiCentroNeeds(data))
+      .catch(() => {})
+  }, [token, user?.centroId])
 
   const causasActivas = causas.filter((c) => c.activa)
   const totalMetas = causas.reduce((a, c) => a + c.meta, 0)
@@ -331,9 +359,14 @@ export default function Dashboard() {
   const totalPaginas = Math.ceil(donacionesFiltradas.length / POR_PAGINA)
   const donacionesPagina = donacionesFiltradas.slice((pagina - 1) * POR_PAGINA, pagina * POR_PAGINA)
 
-  function handleEditarDonacion(nuevoEstado: EstadoDonacion) {
+  async function handleEditarDonacion(nuevoEstado: EstadoDonacion) {
     if (!donacionEditar) return
-    setDonaciones(prev => prev.map(d => d.id === donacionEditar.id ? { ...d, estado: nuevoEstado } : d))
+    try {
+      await api.patch(`/api/donaciones/${donacionEditar.id}/estado`, { estado: nuevoEstado.toUpperCase() })
+      setDonaciones(prev => prev.map(d => d.id === donacionEditar!.id ? { ...d, estado: nuevoEstado } : d))
+    } catch {
+      alert('No se pudo actualizar el estado.')
+    }
     setDonacionEditar(null)
   }
 
@@ -348,8 +381,28 @@ export default function Dashboard() {
     setDonacionEliminar(null)
   }
 
-  function handleToggleCausa(id: number) {
-    setCausas(prev => prev.map(c => c.id === id ? { ...c, activa: !c.activa } : c))
+  async function handleToggleCausa(id: number) {
+    try {
+      const { data } = await api.patch<ApiCausa>(`/api/causas/${id}/toggle`, {})
+      setCausas(prev => prev.map(c => c.id === id ? mapApiCausa(data) : c))
+    } catch {
+      alert('No se pudo cambiar el estado de la causa.')
+    }
+  }
+
+  async function handleToggleDestacada(id: number) {
+    try {
+      const { data } = await api.patch<ApiCausa>(`/api/causas/${id}/destacar`, {})
+      setCausas(prev => prev.map(c => {
+        if (c.id === id) return { ...c, destacada: data.destacada }
+        // Si se activó esta, desactivar las demás en el estado local
+        // (solo 1 puede aparecer en el banner de inicio a la vez)
+        if (data.destacada) return { ...c, destacada: false }
+        return c
+      }))
+    } catch {
+      alert('No se pudo actualizar la causa.')
+    }
   }
 
   async function handleEliminarCausa() {
@@ -363,6 +416,8 @@ export default function Dashboard() {
     setCausaEliminar(null)
   }
 
+
+
   async function handleEliminarCentro(id: number) {
     try {
       await api.delete(`/api/centros/${id}`)
@@ -372,17 +427,64 @@ export default function Dashboard() {
     setCentros(prev => prev.filter(c => c.id !== id))
   }
 
-  async function handleCambiarRol(id: number) {
-    const u = usuarios.find(usr => usr.id === id)
-    if (!u) return
-    const nuevoRolBackend = u.rol === 'admin' ? 'DONANTE' : 'ADMIN'
+  async function handleAprobarDonacion(id: number) {
+    try {
+      await api.patch(`/api/donaciones/${id}/aprobar`, {})
+      setDonaciones(prev => prev.map(d =>
+        d.id === id ? { ...d, requiereAprobacion: false } as typeof d : d
+      ))
+      // Refrescar causas para mostrar el recaudado actualizado
+      const { data: causasRaw } = await api.get<ApiCausa[]>('/api/causas')
+      setCausas(causasRaw.map(mapApiCausa))
+    } catch {
+      alert('Error al aprobar la donación.')
+    }
+  }
+
+  async function handleAprobarTestimonio(id: number) {
+    try {
+      await api.put(`/api/testimonios/${id}/aprobar`, {})
+      setTestimoniosPendientes(prev => prev.filter(t => t.id !== id))
+    } catch {
+      alert('Error al aprobar el testimonio.')
+    }
+  }
+
+  async function uploadImagen(file: File): Promise<string | null> {
+    const fd = new FormData()
+    fd.append('file', file)
+    try {
+      const { data } = await api.post<{ url: string }>('/api/imagenes/upload', fd, {
+        headers: { 'Content-Type': undefined },
+      })
+      return data.url
+    } catch {
+      return null
+    }
+  }
+
+  async function handleAsignarCentro(id: number, centroId: number | null) {
+    try {
+      await api.patch(`/admin/usuarios/${id}/centro`, { centroId })
+      setUsuarios(prev => prev.map(u => u.id === id ? { ...u, centroId: centroId ?? undefined } : u))
+    } catch {
+      alert('Error al asignar el centro.')
+    }
+  }
+
+  async function handleCambiarRol(id: number, nuevoRolBackend: string) {
+    setCambiandoRolId(id)
     try {
       await api.patch(`/admin/usuarios/${id}/rol`, { rol: nuevoRolBackend })
-      setUsuarios(prev => prev.map(usr =>
-        usr.id === id ? { ...usr, rol: u.rol === 'admin' ? 'donador' : 'admin' } : usr
-      ))
+      const rolFrontend: User['rol'] =
+        nuevoRolBackend === 'ADMIN'        ? 'admin' :
+        nuevoRolBackend === 'EMPRESA'      ? 'empresa' :
+        nuevoRolBackend === 'CENTRO_ADMIN' ? 'centro_admin' : 'donador'
+      setUsuarios(prev => prev.map(u => u.id === id ? { ...u, rol: rolFrontend } : u))
     } catch {
       alert('Error al cambiar el rol.')
+    } finally {
+      setCambiandoRolId(null)
     }
   }
 
@@ -397,12 +499,19 @@ export default function Dashboard() {
     )
   }
 
-  const TABS: { id: Tab; label: string }[] = [
-    { id: 'resumen', label: 'Resumen' },
-    { id: 'donaciones', label: `Donaciones (${donaciones.length})` },
-    { id: 'causas', label: `Causas (${causas.length})` },
-    { id: 'usuarios', label: `Usuarios (${usuarios.length})` },
-    { id: 'centros', label: `Centros (${centros.length})` },
+  const isCentroAdmin = user?.rol === 'centro_admin'
+  const TABS: { id: Tab; label: string; badge?: number }[] = [
+    ...(!isCentroAdmin ? [
+      { id: 'resumen' as Tab, label: 'Resumen' },
+      { id: 'donaciones' as Tab, label: `Donaciones (${donaciones.length})` },
+      { id: 'causas' as Tab, label: `Causas (${causas.length})` },
+      { id: 'usuarios' as Tab, label: `Usuarios (${usuarios.length})` },
+      { id: 'centros' as Tab, label: `Centros (${centros.length})` },
+      { id: 'testimonios' as Tab, label: 'Testimonios', badge: testimoniosPendientes.length },
+    ] : []),
+    ...(user?.centroId ? [
+      { id: 'mi-centro' as Tab, label: '🏪 Mi Centro', badge: miCentroNeeds.filter(n => n.urgente).length || undefined },
+    ] : []),
   ]
 
   return (
@@ -420,11 +529,16 @@ export default function Dashboard() {
             <button
               key={t.id}
               onClick={() => setTab(t.id)}
-              className={`px-4 py-2 rounded-lg text-sm font-semibold whitespace-nowrap transition-colors ${
+              className={`relative px-4 py-2 rounded-lg text-sm font-semibold whitespace-nowrap transition-colors ${
                 tab === t.id ? 'bg-orange-500 text-white shadow-sm' : 'text-gray-500 hover:text-gray-800 hover:bg-gray-50'
               }`}
             >
               {t.label}
+              {t.badge != null && t.badge > 0 && (
+                <span className="absolute -top-1 -right-1 w-4 h-4 bg-red-500 text-white text-[10px] font-bold rounded-full flex items-center justify-center">
+                  {t.badge}
+                </span>
+              )}
             </button>
           ))}
         </div>
@@ -573,7 +687,11 @@ export default function Dashboard() {
                   <tbody className="divide-y divide-gray-50">
                     {donacionesPagina.map(d => (
                       <tr key={d.id} className="hover:bg-gray-50/50 transition-colors">
-                        <td className="px-4 py-3 font-medium text-gray-900">{d.anonima ? 'Anónimo' : d.donadorNombre}</td>
+                        <td className="px-4 py-3">
+                          <span className="font-medium text-gray-900">{d.anonima ? 'Anónimo' : d.donadorNombre}</span>
+                          {d.esEmpresa && <span className="ml-1.5 text-xs bg-blue-100 text-blue-700 px-1.5 py-0.5 rounded font-medium">🏢 Empresa</span>}
+                          {d.requiereAprobacion && <span className="ml-1 text-xs bg-yellow-100 text-yellow-700 px-1.5 py-0.5 rounded font-medium">⏳ Aprobación</span>}
+                        </td>
                         <td className="px-4 py-3 max-w-[180px]">
                           <p className="text-gray-600 truncate">{d.causaTitulo}</p>
                           {d.descripcion && <p className="text-xs text-gray-400 truncate mt-0.5">{d.descripcion}</p>}
@@ -585,10 +703,24 @@ export default function Dashboard() {
                         </td>
                         <td className="px-4 py-3 font-bold text-orange-500">${d.monto.toLocaleString('es-CL')}</td>
                         <td className="px-4 py-3"><span className="text-xs bg-gray-100 text-gray-600 px-2 py-1 rounded-full">{TIPO_LABEL[d.tipo]}</span></td>
-                        <td className="px-4 py-3"><span className={`text-xs px-2 py-1 rounded-full font-medium ${ESTADO_COLOR[d.estado]}`}>{ESTADO_LABEL[d.estado]}</span></td>
+                        <td className="px-4 py-3">
+                          <span className={`text-xs px-2 py-1 rounded-full font-medium ${ESTADO_COLOR[d.estado]}`}>{ESTADO_LABEL[d.estado]}</span>
+                          {(d as DonacionExtendida & { requiereAprobacion?: boolean }).requiereAprobacion && (
+                            <span className="ml-1 text-xs bg-amber-100 text-amber-700 px-2 py-0.5 rounded-full font-semibold">Requiere aprobación</span>
+                          )}
+                        </td>
                         <td className="px-4 py-3 text-gray-400 whitespace-nowrap">{formatDate(d.fecha)}</td>
                         <td className="px-4 py-3">
-                          <div className="flex gap-1">
+                          <div className="flex gap-1 items-center">
+                            {(d as DonacionExtendida & { requiereAprobacion?: boolean }).requiereAprobacion && (
+                              <button
+                                onClick={() => handleAprobarDonacion(d.id)}
+                                className="px-2 py-1 text-xs font-bold bg-amber-500 hover:bg-amber-600 text-white rounded-lg transition-colors"
+                                title="Aprobar donación empresarial"
+                              >
+                                Aprobar
+                              </button>
+                            )}
                             <button onClick={() => setDonacionDetalle(d)} className="p-1.5 text-gray-400 hover:text-blue-500 hover:bg-blue-50 rounded-lg transition-colors" title="Ver detalle">
                               <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" /><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" /></svg>
                             </button>
@@ -634,6 +766,8 @@ export default function Dashboard() {
                   <thead>
                     <tr className="bg-gray-50 text-left">
                       <th className="px-4 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wide">Causa</th>
+                      <th className="px-4 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wide">Centro</th>
+                      <th className="px-4 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wide">Tipo</th>
                       <th className="px-4 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wide">Categoría</th>
                       <th className="px-4 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wide">Meta</th>
                       <th className="px-4 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wide">Avance</th>
@@ -649,6 +783,16 @@ export default function Dashboard() {
                           <td className="px-4 py-3">
                             <p className="font-medium text-gray-900 max-w-[220px] truncate">{c.titulo}</p>
                             <p className="text-xs text-gray-400">{formatDate(c.fechaFin)}</p>
+                          </td>
+                          <td className="px-4 py-3">
+                            {c.centroNombre
+                              ? <span className="text-xs text-orange-700 bg-orange-50 border border-orange-100 px-2 py-0.5 rounded-full">📍 {c.centroNombre}</span>
+                              : <span className="text-xs text-gray-300">—</span>}
+                          </td>
+                          <td className="px-4 py-3">
+                            {c.tipo
+                              ? <span className="text-xs bg-orange-50 text-orange-700 border border-orange-100 px-2 py-1 rounded-full">{c.tipo}</span>
+                              : <span className="text-xs text-gray-300">—</span>}
                           </td>
                           <td className="px-4 py-3"><span className="text-xs bg-gray-100 text-gray-600 px-2 py-1 rounded-full">{c.categoria}</span></td>
                           <td className="px-4 py-3 text-gray-600">${c.meta.toLocaleString('es-CL')}</td>
@@ -667,6 +811,9 @@ export default function Dashboard() {
                           </td>
                           <td className="px-4 py-3">
                             <div className="flex gap-1">
+                              <button onClick={() => handleToggleDestacada(c.id)} className={`p-1.5 rounded-lg transition-colors ${c.destacada ? 'text-yellow-500 bg-yellow-50' : 'text-gray-300 hover:text-yellow-400 hover:bg-yellow-50'}`} title={c.destacada ? 'Quitar urgente' : 'Marcar como urgente'}>
+                                ⭐
+                              </button>
                               <button onClick={() => setCausaEditar(c)} className="p-1.5 text-gray-400 hover:text-orange-500 hover:bg-orange-50 rounded-lg transition-colors" title="Editar">
                                 <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" /></svg>
                               </button>
@@ -698,9 +845,8 @@ export default function Dashboard() {
                     <th className="px-4 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wide">Usuario</th>
                     <th className="px-4 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wide">Email</th>
                     <th className="px-4 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wide">Rol</th>
+                    <th className="px-4 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wide">Centro asignado</th>
                     <th className="px-4 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wide">Registro</th>
-                    <th className="px-4 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wide">Donaciones</th>
-                    <th className="px-4 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wide">Acciones</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-gray-50">
@@ -714,20 +860,50 @@ export default function Dashboard() {
                       </td>
                       <td className="px-4 py-3 text-gray-500">{u.email}</td>
                       <td className="px-4 py-3">
-                        <span className={`text-xs px-2 py-1 rounded-full font-medium ${u.rol === 'admin' ? 'bg-purple-100 text-purple-700' : 'bg-gray-100 text-gray-600'}`}>
-                          {u.rol === 'admin' ? 'Admin' : 'Donante'}
-                        </span>
+                        <div className="relative inline-block">
+                          <select
+                            value={u.rol === 'admin' ? 'ADMIN' : u.rol === 'empresa' ? 'EMPRESA' : u.rol === 'centro_admin' ? 'CENTRO_ADMIN' : 'DONANTE'}
+                            onChange={e => handleCambiarRol(u.id, e.target.value)}
+                            disabled={cambiandoRolId === u.id}
+                            className={`text-xs font-medium pl-2.5 pr-6 py-1 rounded-full appearance-none cursor-pointer border-0 focus:outline-none focus:ring-2 focus:ring-offset-1 focus:ring-orange-400 transition-colors disabled:opacity-50 disabled:cursor-wait ${
+                              u.rol === 'admin'        ? 'bg-purple-100 text-purple-700 hover:bg-purple-200' :
+                              u.rol === 'empresa'      ? 'bg-blue-100   text-blue-700   hover:bg-blue-200'   :
+                              u.rol === 'centro_admin' ? 'bg-teal-100   text-teal-700   hover:bg-teal-200'   :
+                                                         'bg-gray-100   text-gray-600   hover:bg-gray-200'
+                            }`}
+                          >
+                            <option value="DONANTE">Donante</option>
+                            <option value="EMPRESA">Empresa</option>
+                            <option value="CENTRO_ADMIN">Encargado de Centro</option>
+                            <option value="ADMIN">Admin</option>
+                          </select>
+                          <svg
+                            className={`pointer-events-none absolute right-1.5 top-1/2 -translate-y-1/2 w-3 h-3 ${
+                              u.rol === 'admin' ? 'text-purple-500' : u.rol === 'empresa' ? 'text-blue-500' : 'text-gray-400'
+                            }`}
+                            fill="none" stroke="currentColor" viewBox="0 0 24 24"
+                          >
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                          </svg>
+                        </div>
+                      </td>
+                      <td className="px-4 py-3">
+                        {u.rol === 'centro_admin' ? (
+                          <select
+                            value={u.centroId ?? ''}
+                            onChange={e => handleAsignarCentro(u.id, e.target.value ? Number(e.target.value) : null)}
+                            className="border border-gray-200 rounded-xl px-3 py-1.5 text-xs focus:outline-none focus:ring-2 focus:ring-orange-400 bg-white max-w-[200px]"
+                          >
+                            <option value="">— Sin asignar —</option>
+                            {centros.map(c => (
+                              <option key={c.id} value={c.id}>{c.nombre}</option>
+                            ))}
+                          </select>
+                        ) : (
+                          <span className="text-gray-300 text-xs">—</span>
+                        )}
                       </td>
                       <td className="px-4 py-3 text-gray-400">{u.fechaRegistro ? new Date(u.fechaRegistro).toLocaleDateString('es-CL') : '—'}</td>
-                      <td className="px-4 py-3 text-gray-600">{u.totalDonaciones ?? 0}</td>
-                      <td className="px-4 py-3">
-                        <button
-                          onClick={() => handleCambiarRol(u.id)}
-                          className="text-xs px-3 py-1.5 border border-gray-200 rounded-lg hover:bg-gray-50 text-gray-600 transition-colors"
-                        >
-                          Cambiar rol
-                        </button>
-                      </td>
                     </tr>
                   ))}
                 </tbody>
@@ -767,12 +943,14 @@ export default function Dashboard() {
                           <td className="px-4 py-3 font-medium text-gray-900">{c.nombre}</td>
                           <td className="px-4 py-3"><span className="text-xs bg-gray-100 text-gray-600 px-2 py-1 rounded-full">{c.region}</span></td>
                           <td className="px-4 py-3 text-gray-500 max-w-[200px] truncate">{c.direccion}</td>
-                          <td className="px-4 py-3 min-w-[130px]">
+                          <td className="px-4 py-3 min-w-[150px]">
                             <div className="flex items-center gap-2">
                               <div className="flex-1 h-1.5 bg-gray-100 rounded-full overflow-hidden">
-                                <div className={`h-full rounded-full ${pct > 80 ? 'bg-red-400' : pct > 60 ? 'bg-yellow-400' : 'bg-emerald-400'}`} style={{ width: `${Math.min(pct, 100)}%` }} />
+                                <div className={`h-full rounded-full ${pct > 100 ? 'bg-red-500' : pct > 80 ? 'bg-red-400' : pct > 60 ? 'bg-yellow-400' : 'bg-emerald-400'}`} style={{ width: `${Math.min(pct, 100)}%` }} />
                               </div>
-                              <span className="text-xs text-gray-500">{c.capacidadActual}/{c.capacidadMax}</span>
+                              <span className={`text-xs ${pct > 100 ? 'text-red-500 font-semibold' : 'text-gray-500'}`}>
+                                {c.capacidadActual}/{c.capacidadMax}{c.unidadCapacidad ? ` ${c.unidadCapacidad}` : ''}
+                              </span>
                             </div>
                           </td>
                           <td className="px-4 py-3 text-center">
@@ -807,7 +985,350 @@ export default function Dashboard() {
             </div>
           </div>
         )}
+        {/* ═══════ TAB: MI CENTRO ═══════ */}
+        {tab === 'mi-centro' && user?.centroId && (() => {
+          const miCentro = centros.find(c => c.id === user.centroId)
+
+          async function toggleUrgente(n: import('../types').Necesidad) {
+            try {
+              const { data } = await api.put<import('../types').Necesidad>(`/api/necesidades/${n.id}`, {
+                tipo: n.tipo, descripcion: n.descripcion,
+                metaUnidades: n.metaUnidades, unidadesActuales: n.unidadesActuales,
+                urgente: !n.urgente, diasRestantes: n.diasRestantes,
+              })
+              setMiCentroNeeds(prev => prev.map(x => x.id === n.id ? data : x))
+            } catch { /* silencioso */ }
+          }
+
+          async function actualizarUnidades(n: import('../types').Necesidad, val: number) {
+            if (val === n.unidadesActuales) return
+            try {
+              const { data } = await api.put<import('../types').Necesidad>(`/api/necesidades/${n.id}`, {
+                tipo: n.tipo, descripcion: n.descripcion,
+                metaUnidades: n.metaUnidades, unidadesActuales: val,
+                urgente: n.urgente, diasRestantes: n.diasRestantes,
+              })
+              setMiCentroNeeds(prev => prev.map(x => x.id === n.id ? data : x))
+            } catch { /* silencioso */ }
+          }
+
+          return (
+            <div className="space-y-6">
+              {/* Header del centro */}
+              {miCentro ? (
+                <div className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden">
+                  <div className="bg-gradient-to-r from-orange-500 to-amber-500 px-6 py-5">
+                    <h2 className="text-xl font-extrabold text-white">{miCentro.nombre}</h2>
+                    <p className="text-white/80 text-sm mt-1">
+                      {miCentro.direccion && `${miCentro.direccion} · `}{miCentro.ciudad}, {miCentro.region}
+                    </p>
+                  </div>
+                  <div className="p-5 grid grid-cols-2 sm:grid-cols-4 gap-4 items-center">
+                    <div className="text-center">
+                      <p className="text-3xl font-extrabold text-gray-900">{miCentroNeeds.length}</p>
+                      <p className="text-xs text-gray-400 mt-1">Tipos de necesidad</p>
+                    </div>
+                    <div className="text-center">
+                      <p className="text-3xl font-extrabold text-red-600">{miCentroNeeds.filter(n => n.urgente).length}</p>
+                      <p className="text-xs text-gray-400 mt-1">Urgentes ahora</p>
+                    </div>
+                    {miCentro.capacidadMax > 0 && (
+                      <div className="col-span-2">
+                        <div className="flex justify-between text-xs text-gray-500 mb-1.5">
+                          <span>Capacidad del centro</span>
+                          <span className={`font-semibold ${miCentro.capacidadActual > miCentro.capacidadMax ? 'text-red-500' : 'text-gray-700'}`}>
+                            {miCentro.capacidadActual}/{miCentro.capacidadMax} {miCentro.unidadCapacidad ?? 'unidades'}
+                          </span>
+                        </div>
+                        <div className="h-2.5 bg-gray-100 rounded-full overflow-hidden">
+                          <div className={`h-full rounded-full ${
+                            miCentro.capacidadActual > miCentro.capacidadMax ? 'bg-red-400'
+                            : miCentro.capacidadActual / miCentro.capacidadMax > 0.8 ? 'bg-amber-400'
+                            : 'bg-green-400'
+                          }`} style={{ width: `${Math.min(Math.round((miCentro.capacidadActual / miCentro.capacidadMax) * 100), 100)}%` }} />
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                </div>
+              ) : (
+                <div className="bg-amber-50 border border-amber-200 rounded-2xl p-5 text-sm text-amber-700">
+                  No se encontró la información de tu centro. Contacta al administrador.
+                </div>
+              )}
+
+              {/* Gestión de necesidades */}
+              <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-6">
+                <div className="flex items-start justify-between gap-4 mb-6">
+                  <div>
+                    <h3 className="font-extrabold text-gray-900 text-lg">Necesidades del centro</h3>
+                    <p className="text-sm text-gray-400 mt-0.5">
+                      Activa el modo urgente → el pin del mapa se vuelve 🔴 rojo para los donadores
+                    </p>
+                  </div>
+                  <button
+                    onClick={() => setShowNuevaNeed(true)}
+                    className="shrink-0 flex items-center gap-2 bg-orange-500 hover:bg-orange-600 text-white font-bold text-sm px-4 py-2.5 rounded-xl transition-colors"
+                  >
+                    + Agregar
+                  </button>
+                </div>
+
+                {miCentroNeeds.length === 0 ? (
+                  <div className="text-center py-14">
+                    <div className="text-5xl mb-3">📋</div>
+                    <p className="font-bold text-gray-700 text-lg">No hay necesidades registradas</p>
+                    <p className="text-sm text-gray-400 mt-1 mb-5">Agrega los tipos de donaciones que tu centro necesita ahora</p>
+                    <button
+                      onClick={() => setShowNuevaNeed(true)}
+                      className="px-5 py-2.5 bg-orange-500 hover:bg-orange-600 text-white font-bold text-sm rounded-xl transition-colors"
+                    >
+                      + Agregar primera necesidad
+                    </button>
+                  </div>
+                ) : (
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                    {miCentroNeeds.map(n => {
+                      const pct = n.metaUnidades ? Math.min(Math.round((n.unidadesActuales / n.metaUnidades) * 100), 100) : 0
+                      return (
+                        <div key={n.id} className={`rounded-2xl border-2 p-5 transition-all ${
+                          n.urgente ? 'border-red-300 bg-red-50' : 'border-gray-100 bg-gray-50'
+                        }`}>
+                          {/* Cabecera: tipo + botón urgente */}
+                          <div className="flex items-start justify-between gap-3 mb-3">
+                            <div className="flex items-center gap-2">
+                              <span className="text-2xl">{NECESIDAD_EMOJI[n.tipo] ?? '📦'}</span>
+                              <h4 className="font-extrabold text-gray-900 text-base">{n.tipo}</h4>
+                            </div>
+                            <button
+                              onClick={() => toggleUrgente(n)}
+                              className={`shrink-0 flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-extrabold border-2 transition-all ${
+                                n.urgente
+                                  ? 'bg-red-600 text-white border-red-600 shadow-sm'
+                                  : 'bg-white text-gray-400 border-gray-200 hover:border-red-300 hover:text-red-500'
+                              }`}
+                            >
+                              🚨 {n.urgente ? 'URGENTE' : 'Normal'}
+                            </button>
+                          </div>
+
+                          {n.descripcion && (
+                            <p className="text-sm text-gray-500 mb-3">{n.descripcion}</p>
+                          )}
+
+                          {/* Barra progreso */}
+                          <div className="mb-3">
+                            <div className="flex justify-between text-xs text-gray-500 mb-1.5">
+                              <span>{n.unidadesActuales} recibidas</span>
+                              <span className="font-semibold">{pct}% de {n.metaUnidades ?? '?'}</span>
+                            </div>
+                            <div className="h-2.5 bg-gray-200 rounded-full overflow-hidden">
+                              <div
+                                className={`h-full rounded-full transition-all ${pct >= 80 ? 'bg-green-500' : pct >= 40 ? 'bg-orange-400' : 'bg-red-500'}`}
+                                style={{ width: `${pct}%` }}
+                              />
+                            </div>
+                          </div>
+
+                          {/* Actualizar unidades + acciones */}
+                          <div className="flex gap-2 items-center">
+                            <input
+                              type="number"
+                              key={`units-${n.id}-${n.unidadesActuales}`}
+                              defaultValue={n.unidadesActuales}
+                              min={0}
+                              className="flex-1 border border-gray-200 rounded-lg px-3 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-orange-400 bg-white"
+                              placeholder="Unidades recibidas"
+                              onBlur={e => actualizarUnidades(n, Number(e.target.value))}
+                            />
+                            <button
+                              onClick={() => setNeedEditar(n)}
+                              className="p-2 border border-gray-200 rounded-lg text-gray-500 hover:text-orange-500 hover:border-orange-300 hover:bg-orange-50 transition-colors"
+                              title="Editar"
+                            >
+                              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
+                              </svg>
+                            </button>
+                            <button
+                              onClick={() => setNeedEliminar(n)}
+                              className="p-2 border border-red-100 rounded-lg text-red-400 hover:text-red-600 hover:bg-red-50 transition-colors"
+                              title="Eliminar"
+                            >
+                              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                              </svg>
+                            </button>
+                          </div>
+                        </div>
+                      )
+                    })}
+                  </div>
+                )}
+              </div>
+            </div>
+          )
+        })()}
+
+        {/* ═══════ TAB: TESTIMONIOS ═══════ */}
+        {tab === 'testimonios' && (
+          <div className="space-y-4">
+            <div className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden">
+              <div className="px-6 py-4 border-b border-gray-100 flex items-center justify-between">
+                <h2 className="font-bold text-gray-900">Testimonios pendientes de aprobación</h2>
+                <span className="text-xs text-gray-400">{testimoniosPendientes.length} pendientes</span>
+              </div>
+              {testimoniosPendientes.length === 0 ? (
+                <div className="py-16 text-center text-gray-400 text-sm">
+                  No hay testimonios pendientes de aprobación.
+                </div>
+              ) : (
+                <div className="divide-y divide-gray-50">
+                  {testimoniosPendientes.map(t => (
+                    <div key={t.id} className="px-6 py-4 flex items-center justify-between gap-4">
+                      <div className="flex-1 min-w-0">
+                        <p className="font-semibold text-gray-900 text-sm truncate">{t.titulo}</p>
+                        <p className="text-xs text-gray-400 mt-0.5">Por {t.autorNombre} · {formatDate(t.fechaCreacion)}</p>
+                      </div>
+                      <button
+                        onClick={() => handleAprobarTestimonio(t.id)}
+                        className="flex-shrink-0 bg-emerald-500 hover:bg-emerald-600 text-white text-xs font-semibold px-4 py-2 rounded-xl transition-colors"
+                      >
+                        Aprobar
+                      </button>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          </div>
+        )}
       </div>
+
+      {/* ═══ MODAL: Nueva necesidad ═══ */}
+      {showNuevaNeed && user?.centroId && (
+        <Modal title="Agregar necesidad" onClose={() => setShowNuevaNeed(false)}>
+          <form onSubmit={async e => {
+            e.preventDefault()
+            const fd = new FormData(e.currentTarget)
+            const body = {
+              tipo: fd.get('tipo') as string,
+              descripcion: fd.get('descripcion') as string || undefined,
+              metaUnidades: Number(fd.get('metaUnidades')) || undefined,
+              unidadesActuales: Number(fd.get('unidadesActuales')) || 0,
+              urgente: fd.get('urgente') === 'on',
+              diasRestantes: Number(fd.get('diasRestantes')) || undefined,
+            }
+            try {
+              const { data } = await api.post<import('../types').Necesidad>(
+                `/api/centros/${user.centroId}/necesidades`, body
+              )
+              setMiCentroNeeds(prev => [...prev, data])
+              setShowNuevaNeed(false)
+            } catch { alert('Error al crear la necesidad.') }
+          }} className="space-y-3">
+            <div>
+              <label className="block text-xs font-medium text-gray-600 mb-1">Tipo de necesidad</label>
+              <select name="tipo" required className="w-full border border-gray-200 rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-orange-400 bg-white">
+                {NECESIDAD_TIPOS.map(t => <option key={t} value={t}>{NECESIDAD_EMOJI[t]} {t}</option>)}
+              </select>
+            </div>
+            <div>
+              <label className="block text-xs font-medium text-gray-600 mb-1">Descripción <span className="font-normal text-gray-400">(opcional)</span></label>
+              <textarea name="descripcion" rows={2} placeholder="Ej: Frazadas dobles para adultos..." className="w-full border border-gray-200 rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-orange-400 resize-none" />
+            </div>
+            <div className="grid grid-cols-2 gap-3">
+              <div>
+                <label className="block text-xs font-medium text-gray-600 mb-1">Meta (unidades)</label>
+                <input type="number" name="metaUnidades" min={1} placeholder="200" className="w-full border border-gray-200 rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-orange-400" />
+              </div>
+              <div>
+                <label className="block text-xs font-medium text-gray-600 mb-1">Recibidas hasta ahora</label>
+                <input type="number" name="unidadesActuales" min={0} defaultValue={0} className="w-full border border-gray-200 rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-orange-400" />
+              </div>
+            </div>
+            <div className="flex items-center gap-3 p-3 bg-red-50 border border-red-100 rounded-xl">
+              <input type="checkbox" name="urgente" id="urgente-new" className="w-4 h-4 accent-red-500" />
+              <label htmlFor="urgente-new" className="text-sm font-semibold text-red-700 cursor-pointer">
+                🚨 Marcar como URGENTE (pin rojo en el mapa)
+              </label>
+            </div>
+            <div className="flex gap-3 pt-1">
+              <button type="submit" className="flex-1 bg-orange-500 hover:bg-orange-600 text-white font-bold py-2.5 rounded-xl text-sm transition-colors">Agregar</button>
+              <button type="button" onClick={() => setShowNuevaNeed(false)} className="px-5 py-2.5 border border-gray-200 rounded-xl text-gray-600 text-sm hover:bg-gray-50 transition-colors">Cancelar</button>
+            </div>
+          </form>
+        </Modal>
+      )}
+
+      {/* ═══ MODAL: Editar necesidad ═══ */}
+      {needEditar && (
+        <Modal title="Editar necesidad" onClose={() => setNeedEditar(null)}>
+          <form onSubmit={async e => {
+            e.preventDefault()
+            const fd = new FormData(e.currentTarget)
+            const body = {
+              tipo: fd.get('tipo') as string,
+              descripcion: fd.get('descripcion') as string || undefined,
+              metaUnidades: Number(fd.get('metaUnidades')) || undefined,
+              unidadesActuales: Number(fd.get('unidadesActuales')) || 0,
+              urgente: fd.get('urgente') === 'on',
+              diasRestantes: Number(fd.get('diasRestantes')) || undefined,
+            }
+            try {
+              const { data } = await api.put<import('../types').Necesidad>(`/api/necesidades/${needEditar.id}`, body)
+              setMiCentroNeeds(prev => prev.map(x => x.id === needEditar.id ? data : x))
+              setNeedEditar(null)
+            } catch { alert('Error al actualizar la necesidad.') }
+          }} className="space-y-3">
+            <div>
+              <label className="block text-xs font-medium text-gray-600 mb-1">Tipo de necesidad</label>
+              <select name="tipo" defaultValue={needEditar.tipo} required className="w-full border border-gray-200 rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-orange-400 bg-white">
+                {NECESIDAD_TIPOS.map(t => <option key={t} value={t}>{NECESIDAD_EMOJI[t]} {t}</option>)}
+              </select>
+            </div>
+            <div>
+              <label className="block text-xs font-medium text-gray-600 mb-1">Descripción</label>
+              <textarea name="descripcion" rows={2} defaultValue={needEditar.descripcion ?? ''} className="w-full border border-gray-200 rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-orange-400 resize-none" />
+            </div>
+            <div className="grid grid-cols-2 gap-3">
+              <div>
+                <label className="block text-xs font-medium text-gray-600 mb-1">Meta (unidades)</label>
+                <input type="number" name="metaUnidades" min={1} defaultValue={needEditar.metaUnidades ?? ''} className="w-full border border-gray-200 rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-orange-400" />
+              </div>
+              <div>
+                <label className="block text-xs font-medium text-gray-600 mb-1">Recibidas</label>
+                <input type="number" name="unidadesActuales" min={0} defaultValue={needEditar.unidadesActuales} className="w-full border border-gray-200 rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-orange-400" />
+              </div>
+            </div>
+            <div className="flex items-center gap-3 p-3 bg-red-50 border border-red-100 rounded-xl">
+              <input type="checkbox" name="urgente" id="urgente-edit" defaultChecked={needEditar.urgente} className="w-4 h-4 accent-red-500" />
+              <label htmlFor="urgente-edit" className="text-sm font-semibold text-red-700 cursor-pointer">
+                🚨 URGENTE (pin rojo en el mapa)
+              </label>
+            </div>
+            <div className="flex gap-3 pt-1">
+              <button type="submit" className="flex-1 bg-orange-500 hover:bg-orange-600 text-white font-bold py-2.5 rounded-xl text-sm transition-colors">Guardar</button>
+              <button type="button" onClick={() => setNeedEditar(null)} className="px-5 py-2.5 border border-gray-200 rounded-xl text-gray-600 text-sm hover:bg-gray-50 transition-colors">Cancelar</button>
+            </div>
+          </form>
+        </Modal>
+      )}
+
+      {/* ═══ MODAL: Confirmar eliminar necesidad ═══ */}
+      {needEliminar && (
+        <ConfirmModal
+          message={`¿Eliminar la necesidad de ${needEliminar.tipo}? El mapa ya no la reflejará.`}
+          onConfirm={async () => {
+            try {
+              await api.delete(`/api/necesidades/${needEliminar.id}`)
+            } catch { /* silencioso */ }
+            setMiCentroNeeds(prev => prev.filter(x => x.id !== needEliminar.id))
+            setNeedEliminar(null)
+          }}
+          onCancel={() => setNeedEliminar(null)}
+        />
+      )}
 
       {/* ═══ MODAL: Ver detalle donación ═══ */}
       {donacionDetalle && (
@@ -866,11 +1387,32 @@ export default function Dashboard() {
           <form onSubmit={async e => {
             e.preventDefault()
             const fd = new FormData(e.currentTarget)
+            const fileInput = (e.currentTarget.querySelector('input[type="file"]') as HTMLInputElement)
+            const file = fileInput?.files?.[0] ?? null
+            const nuevaImagenUrl = file ? (await uploadImagen(file)) : null
+            const today      = new Date().toISOString().split('T')[0]
+            const fechaInicio = fd.get('fechaInicio') as string || undefined
+            const fechaFin    = fd.get('fechaFin')    as string || undefined
+            if (fechaFin && fechaFin < today) {
+              alert('La fecha de fin debe ser hoy o una fecha futura.')
+              return
+            }
+            if (fechaInicio && fechaFin && fechaFin < fechaInicio) {
+              alert('La fecha de fin no puede ser anterior a la fecha de inicio.')
+              return
+            }
+            const centroIdEditRaw = fd.get('centroId') as string
+            const tipoEdit = fd.get('tipo') as string
             const body = {
               titulo: fd.get('titulo') as string,
               descripcion: fd.get('descripcion') as string,
               meta: Number(fd.get('meta')),
               categoria: causaEditar.categoria,
+              tipo: tipoEdit || undefined,
+              fechaInicio,
+              fechaFin,
+              centroId: centroIdEditRaw ? Number(centroIdEditRaw) : undefined,
+              imagenUrl: nuevaImagenUrl ?? (causaEditar.imagen || undefined),
             }
             try {
               const { data } = await api.put<ApiCausa>(`/api/causas/${causaEditar.id}`, body)
@@ -894,9 +1436,45 @@ export default function Dashboard() {
                 <input type="number" name="meta" defaultValue={causaEditar.meta} required className="w-full border border-gray-200 rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-orange-400" />
               </div>
               <div>
-                <label className="block text-xs font-medium text-gray-600 mb-1">Fecha fin</label>
-                <input type="date" name="fechaFin" defaultValue={causaEditar.fechaFin} className="w-full border border-gray-200 rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-orange-400" />
+                <label className="block text-xs font-medium text-gray-600 mb-1">Fecha inicio</label>
+                <input type="date" name="fechaInicio" defaultValue={causaEditar.fechaInicio ?? ''} className="w-full border border-gray-200 rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-orange-400" />
               </div>
+              <div className="col-span-2">
+                <label className="block text-xs font-medium text-gray-600 mb-1">Fecha fin</label>
+                <input type="date" name="fechaFin" defaultValue={causaEditar.fechaFin ?? ''} min={new Date().toISOString().split('T')[0]} className="w-full border border-gray-200 rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-orange-400" />
+              </div>
+            </div>
+            <div>
+              <label className="block text-xs font-medium text-gray-600 mb-1">
+                Centro de acopio vinculado <span className="font-normal text-gray-400">(opcional)</span>
+              </label>
+              <select name="centroId" defaultValue={causaEditar.centroId ?? ''} className="w-full border border-gray-200 rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-orange-400 bg-white">
+                <option value="">Sin centro específico</option>
+                {centros.filter(c => c.activo).map(c => (
+                  <option key={c.id} value={c.id}>{c.nombre} — {c.ciudad}</option>
+                ))}
+              </select>
+            </div>
+            <div>
+              <label className="block text-xs font-medium text-gray-600 mb-1">
+                Tipo de necesidad <span className="font-normal text-gray-400">(aparece en el filtro del mapa)</span>
+              </label>
+              <select name="tipo" defaultValue={causaEditar.tipo ?? ''} className="w-full border border-gray-200 rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-orange-400 bg-white">
+                <option value="">Sin tipo específico</option>
+                <option value="Frazadas">🧣 Frazadas</option>
+                <option value="Ropa">👕 Ropa</option>
+                <option value="Alimentos">🥫 Alimentos</option>
+                <option value="Medicamentos">💊 Medicamentos</option>
+              </select>
+            </div>
+            <div>
+              <label className="block text-xs font-medium text-gray-600 mb-1">
+                Nueva imagen <span className="font-normal text-gray-400">(opcional — reemplaza la actual)</span>
+              </label>
+              {causaEditar.imagen && (
+                <p className="text-xs text-gray-400 mb-1 truncate">Actual: {causaEditar.imagen}</p>
+              )}
+              <input type="file" accept="image/*" className="w-full text-sm text-gray-600 file:mr-3 file:py-1.5 file:px-3 file:rounded-lg file:border-0 file:text-xs file:font-semibold file:bg-orange-50 file:text-orange-600 hover:file:bg-orange-100" />
             </div>
             <div className="flex gap-3 pt-2">
               <button type="submit" className="flex-1 bg-orange-500 hover:bg-orange-600 text-white font-bold py-2.5 rounded-xl text-sm transition-colors">Guardar</button>
@@ -912,11 +1490,36 @@ export default function Dashboard() {
           <form onSubmit={async e => {
             e.preventDefault()
             const fd = new FormData(e.currentTarget)
+            const fileInput = (e.currentTarget.querySelector('input[type="file"]') as HTMLInputElement)
+            const file = fileInput?.files?.[0] ?? null
+            const imagenUrl = file ? (await uploadImagen(file)) : null
+            const today       = new Date().toISOString().split('T')[0]
+            const fechaInicio = fd.get('fechaInicio') as string || undefined
+            const fechaFin    = fd.get('fechaFin')    as string || undefined
+            if (fechaInicio && fechaInicio < today) {
+              alert('La fecha de inicio debe ser hoy o una fecha futura.')
+              return
+            }
+            if (fechaFin && fechaFin < today) {
+              alert('La fecha de fin debe ser hoy o una fecha futura.')
+              return
+            }
+            if (fechaInicio && fechaFin && fechaFin < fechaInicio) {
+              alert('La fecha de fin no puede ser anterior a la fecha de inicio.')
+              return
+            }
+            const centroIdRaw = fd.get('centroId') as string
+            const tipoRaw = fd.get('tipo') as string
             const body = {
               titulo: fd.get('titulo') as string,
               descripcion: fd.get('descripcion') as string,
               meta: Number(fd.get('meta')),
               categoria: fd.get('categoria') as string,
+              tipo: tipoRaw || undefined,
+              fechaInicio,
+              fechaFin,
+              ...(centroIdRaw ? { centroId: Number(centroIdRaw) } : {}),
+              ...(imagenUrl && { imagenUrl }),
             }
             try {
               const { data } = await api.post<ApiCausa>('/api/causas', body)
@@ -949,9 +1552,40 @@ export default function Dashboard() {
                   <option>Vivienda</option>
                 </select>
               </div>
-              <div className="col-span-2">
+              <div>
+                <label className="block text-xs font-medium text-gray-600 mb-1">Fecha inicio</label>
+                <input type="date" name="fechaInicio" required min={new Date().toISOString().split('T')[0]} className="w-full border border-gray-200 rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-orange-400" />
+              </div>
+              <div>
                 <label className="block text-xs font-medium text-gray-600 mb-1">Fecha fin</label>
-                <input type="date" name="fechaFin" required className="w-full border border-gray-200 rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-orange-400" />
+                <input type="date" name="fechaFin" min={new Date().toISOString().split('T')[0]} className="w-full border border-gray-200 rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-orange-400" />
+              </div>
+              <div className="col-span-2">
+                <label className="block text-xs font-medium text-gray-600 mb-1">
+                  Centro de acopio vinculado <span className="font-normal text-gray-400">(opcional — el pin en el mapa reflejará urgencia)</span>
+                </label>
+                <select name="centroId" className="w-full border border-gray-200 rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-orange-400 bg-white">
+                  <option value="">Sin centro específico</option>
+                  {centros.filter(c => c.activo).map(c => (
+                    <option key={c.id} value={c.id}>{c.nombre} — {c.ciudad}</option>
+                  ))}
+                </select>
+              </div>
+              <div className="col-span-2">
+                <label className="block text-xs font-medium text-gray-600 mb-1">
+                  Tipo de necesidad <span className="font-normal text-gray-400">(aparece en el filtro del mapa)</span>
+                </label>
+                <select name="tipo" className="w-full border border-gray-200 rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-orange-400 bg-white">
+                  <option value="">Sin tipo específico</option>
+                  <option value="Frazadas">🧣 Frazadas</option>
+                  <option value="Ropa">👕 Ropa</option>
+                  <option value="Alimentos">🥫 Alimentos</option>
+                  <option value="Medicamentos">💊 Medicamentos</option>
+                </select>
+              </div>
+              <div className="col-span-2">
+                <label className="block text-xs font-medium text-gray-600 mb-1">Imagen de portada <span className="font-normal text-gray-400">(opcional)</span></label>
+                <input type="file" accept="image/*" className="w-full text-sm text-gray-600 file:mr-3 file:py-1.5 file:px-3 file:rounded-lg file:border-0 file:text-xs file:font-semibold file:bg-orange-50 file:text-orange-600 hover:file:bg-orange-100" />
               </div>
             </div>
             <div className="flex gap-3 pt-2">
@@ -987,16 +1621,19 @@ export default function Dashboard() {
               queRecibe: centroEditar.queRecibe,
               capacidadActual: centroEditar.capacidadActual,
               capacidadMax: centroEditar.capacidadMax,
+              unidadCapacidad: 'dm³',
               latitud: centroEditar.latitud,
               longitud: centroEditar.longitud,
             }
+            setCentroEditarError('')
             try {
               const { data } = await api.put<CentroAcopio>(`/api/centros/${centroEditar.id}`, body)
               setCentros(prev => prev.map(c => c.id === centroEditar.id ? data : c))
-            } catch {
-              setCentros(prev => prev.map(c => c.id === centroEditar.id ? { ...c, ...body } : c))
+              setCentroEditar(null)
+            } catch (err: unknown) {
+              const msg = (err as { response?: { data?: { mensaje?: string; message?: string } } })?.response?.data
+              setCentroEditarError(msg?.mensaje ?? msg?.message ?? 'Error al guardar el centro.')
             }
-            setCentroEditar(null)
           }} className="space-y-3">
             <div>
               <label className="block text-xs font-medium text-gray-600 mb-1">Nombre</label>
@@ -1014,9 +1651,18 @@ export default function Dashboard() {
               <label className="block text-xs font-medium text-gray-600 mb-1">Teléfono</label>
               <input name="telefono" defaultValue={centroEditar.telefono} className="w-full border border-gray-200 rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-orange-400" />
             </div>
+            <div>
+              <label className="block text-xs font-medium text-gray-600 mb-1">Unidad de almacenamiento</label>
+              <p className="text-xs text-gray-500 bg-gray-50 border border-gray-200 rounded-xl px-3 py-2">
+                dm³ — Volumen universal. Ropa: 5 dm³/prenda · Alimento: 3 dm³/item · Medicamento: 1 dm³/item
+              </p>
+            </div>
+            {centroEditarError && (
+              <p className="text-xs text-red-600 bg-red-50 border border-red-200 rounded-xl px-3 py-2">{centroEditarError}</p>
+            )}
             <div className="flex gap-3 pt-2">
               <button type="submit" className="flex-1 bg-orange-500 hover:bg-orange-600 text-white font-bold py-2.5 rounded-xl text-sm transition-colors">Guardar</button>
-              <button type="button" onClick={() => setCentroEditar(null)} className="px-5 py-2.5 border border-gray-200 rounded-xl text-gray-600 text-sm hover:bg-gray-50 transition-colors">Cancelar</button>
+              <button type="button" onClick={() => { setCentroEditar(null); setCentroEditarError('') }} className="px-5 py-2.5 border border-gray-200 rounded-xl text-gray-600 text-sm hover:bg-gray-50 transition-colors">Cancelar</button>
             </div>
           </form>
         </Modal>
@@ -1024,37 +1670,51 @@ export default function Dashboard() {
 
       {/* ═══ MODAL: Nuevo centro ═══ */}
       {showNuevoCentro && (
-        <Modal title="Nuevo centro de acopio" onClose={() => { setShowNuevoCentro(false); setNuevoCentroLat(''); setNuevoCentroLng(''); setHorarioDias('Lun-Vie'); setHorarioAbre('09:00'); setHorarioCierra('18:00') }}>
+        <Modal title="Nuevo centro de acopio" onClose={() => { setShowNuevoCentro(false); setNuevoCentroLat(''); setNuevoCentroLng(''); setNuevoCentroDireccion(''); setNuevoCiudadSeleccionada(''); setNuevoCentroRegion(''); setGeoMensaje(''); setNuevoCentroError(''); setMostrarMapaPicker(false); setHorarioDias('Lun-Vie'); setHorarioAbre('09:00'); setHorarioCierra('18:00') }}>
           <form onSubmit={async e => {
             e.preventDefault()
+            if (guardandoCentro) return
+            if (!nuevoCentroLat || !nuevoCentroLng) {
+              setNuevoCentroError('Debes verificar la dirección con el botón "📍 Verificar" antes de guardar.')
+              return
+            }
             const fd = new FormData(e.currentTarget)
-            const ciudadVal = fd.get('ciudad') as string
-            const ciudadData = CIUDADES_CHILE.find(c => c.ciudad === ciudadVal)
             const body = {
               nombre: fd.get('nombre') as string,
-              direccion: fd.get('direccion') as string,
-              region: ciudadData?.region ?? (fd.get('region') as string),
-              ciudad: ciudadVal,
+              direccion: nuevoCentroDireccion,
+              region: nuevoCentroRegion || nuevoCiudadSeleccionada,
+              ciudad: nuevoCiudadSeleccionada,
               horario: `${horarioDias} ${horarioAbre}-${horarioCierra}`,
               telefono: fd.get('telefono') as string,
               queRecibe: ['Ropa de abrigo'],
               capacidadActual: 0,
               capacidadMax: Number(fd.get('capacidadMax')),
-              latitud: nuevoCentroLat ? Number(nuevoCentroLat) : null,
-              longitud: nuevoCentroLng ? Number(nuevoCentroLng) : null,
+              unidadCapacidad: 'dm³',
+              latitud: Number(nuevoCentroLat),
+              longitud: Number(nuevoCentroLng),
             }
+            setNuevoCentroError('')
+            setGuardandoCentro(true)
             try {
               const { data } = await api.post<CentroAcopio>('/api/centros', body)
               setCentros(prev => [...prev, data])
-            } catch {
-              alert('Error al crear el centro. Verifica que ms-donaciones esté activo.')
+              setShowNuevoCentro(false)
+              setNuevoCentroLat('')
+              setNuevoCentroLng('')
+              setNuevoCentroDireccion('')
+              setNuevoCiudadSeleccionada('')
+              setNuevoCentroRegion('')
+              setGeoMensaje('')
+              setMostrarMapaPicker(false)
+              setHorarioDias('Lun-Vie')
+              setHorarioAbre('09:00')
+              setHorarioCierra('18:00')
+            } catch (err: unknown) {
+              const msg = (err as { response?: { data?: { mensaje?: string; message?: string } } })?.response?.data
+              setNuevoCentroError(msg?.mensaje ?? msg?.message ?? 'Error al crear el centro. Verifica que ms-donaciones esté activo.')
+            } finally {
+              setGuardandoCentro(false)
             }
-            setShowNuevoCentro(false)
-            setNuevoCentroLat('')
-            setNuevoCentroLng('')
-            setHorarioDias('Lun-Vie')
-            setHorarioAbre('09:00')
-            setHorarioCierra('18:00')
           }} className="space-y-3">
             <div className="grid grid-cols-2 gap-3">
               <div className="col-span-2">
@@ -1062,29 +1722,67 @@ export default function Dashboard() {
                 <input name="nombre" required placeholder="Centro Santiago Poniente..." className="w-full border border-gray-200 rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-orange-400" />
               </div>
               <div className="col-span-2">
-                <label className="block text-xs font-medium text-gray-600 mb-1">Ciudad <span className="text-orange-500 font-normal">(ubica el pin en el mapa)</span></label>
-                <select
-                  name="ciudad"
-                  required
-                  className="w-full border border-gray-200 rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-orange-400 bg-white"
-                  onChange={e => {
-                    const found = CIUDADES_CHILE.find(c => c.ciudad === e.target.value)
-                    setNuevoCentroLat(found ? String(found.lat) : '')
-                    setNuevoCentroLng(found ? String(found.lng) : '')
-                  }}
-                >
-                  <option value="">— Selecciona ciudad —</option>
-                  {CIUDADES_CHILE.map(c => (
-                    <option key={c.ciudad} value={c.ciudad}>{c.ciudad} ({c.region})</option>
-                  ))}
-                </select>
-                {nuevoCentroLat && (
-                  <p className="text-xs text-green-600 mt-1">📍 Coordenadas detectadas: {nuevoCentroLat}, {nuevoCentroLng}</p>
+                <label className="block text-xs font-medium text-gray-600 mb-1">Ubicación</label>
+                {!mostrarMapaPicker && !nuevoCentroLat && (
+                  <button
+                    type="button"
+                    onClick={() => setMostrarMapaPicker(true)}
+                    className="w-full flex items-center justify-center gap-2 border-2 border-dashed border-orange-300 hover:border-orange-400 bg-orange-50 hover:bg-orange-100 text-orange-600 font-semibold rounded-xl px-3 py-4 text-sm transition-colors"
+                  >
+                    📍 Clic aquí para seleccionar la ubicación en el mapa
+                  </button>
                 )}
-              </div>
-              <div className="col-span-2">
-                <label className="block text-xs font-medium text-gray-600 mb-1">Dirección exacta</label>
-                <input name="direccion" placeholder="Av. Principal 123..." className="w-full border border-gray-200 rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-orange-400" />
+                {mostrarMapaPicker && (
+                  <MapPicker
+                    onSelect={async (lat, lng) => {
+                      setNuevoCentroLat(String(lat.toFixed(6)))
+                      setNuevoCentroLng(String(lng.toFixed(6)))
+                      setGeoMensaje('⏳ Detectando dirección…')
+                      try {
+                        const res = await fetch(
+                          `https://nominatim.openstreetmap.org/reverse?lat=${lat}&lon=${lng}&format=json&addressdetails=1&countrycodes=cl`,
+                          { headers: { 'Accept-Language': 'es' } }
+                        )
+                        const d = await res.json()
+                        const addr = d.address ?? {}
+                        const calle = addr.road ?? addr.pedestrian ?? ''
+                        const numero = addr.house_number ?? ''
+                        const comuna = addr.municipality ?? addr.suburb ?? addr.city_district ?? ''
+                        const ciudad = addr.city ?? addr.town ?? addr.county ?? comuna
+                        const region = (addr.state ?? '').replace(/^Región\s+(de\s+)?/i, '')
+                        const dir = [numero ? `${calle} ${numero}` : calle, comuna].filter(Boolean).join(', ')
+                        setNuevoCentroDireccion(dir || d.display_name?.split(',').slice(0, 2).join(', ') || '')
+                        setNuevoCiudadSeleccionada(ciudad)
+                        setNuevoCentroRegion(region)
+                        setGeoMensaje(`✓ ${dir || 'Ubicación seleccionada'}`)
+                        setMostrarMapaPicker(false)
+                      } catch {
+                        setGeoMensaje('✓ Ubicación seleccionada en el mapa')
+                        setMostrarMapaPicker(false)
+                      }
+                    }}
+                  />
+                )}
+                {nuevoCentroLat && (
+                  <div className="flex items-center justify-between bg-green-50 border border-green-200 rounded-xl px-3 py-2 mt-1">
+                    <div>
+                      <p className="text-sm font-medium text-green-700">📍 {nuevoCentroDireccion || 'Ubicación seleccionada'}</p>
+                      {geoMensaje.startsWith('✓') && (
+                        <p className="text-xs text-green-600 mt-0.5">{nuevoCentroLat}, {nuevoCentroLng}</p>
+                      )}
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => { setMostrarMapaPicker(true); setNuevoCentroLat(''); setNuevoCentroLng(''); setNuevoCentroDireccion(''); setGeoMensaje('') }}
+                      className="text-xs text-gray-400 hover:text-gray-600 underline ml-3 flex-shrink-0"
+                    >
+                      cambiar
+                    </button>
+                  </div>
+                )}
+                {!nuevoCentroLat && geoMensaje && !geoMensaje.startsWith('✓') && (
+                  <p className="text-xs text-amber-600 mt-1">{geoMensaje}</p>
+                )}
               </div>
               <div className="col-span-2">
                 <label className="block text-xs font-medium text-gray-600 mb-1">Horario de atención</label>
@@ -1117,13 +1815,22 @@ export default function Dashboard() {
                 <p className="text-xs text-gray-400 mt-1">Vista previa: {horarioDias} {horarioAbre}-{horarioCierra}</p>
               </div>
               <div className="col-span-2">
-                <label className="block text-xs font-medium text-gray-600 mb-1">Capacidad máxima (unidades)</label>
-                <input type="number" name="capacidadMax" defaultValue={300} min={1} className="w-40 border border-gray-200 rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-orange-400" />
+                <label className="block text-xs font-medium text-gray-600 mb-1">Capacidad máxima de almacenamiento</label>
+                <div className="flex items-center gap-2">
+                  <input type="number" name="capacidadMax" defaultValue={300} min={1} className="w-32 border border-gray-200 rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-orange-400" />
+                  <span className="text-sm font-semibold text-gray-600">dm³</span>
+                </div>
+                <p className="text-xs text-gray-400 mt-1">
+                  Volumen total disponible. Cada donación ocupa: ropa 5 dm³/prenda · alimento 3 dm³/item · medicamento 1 dm³/item
+                </p>
               </div>
             </div>
+            {nuevoCentroError && (
+              <p className="text-xs text-red-600 bg-red-50 border border-red-200 rounded-xl px-3 py-2">{nuevoCentroError}</p>
+            )}
             <div className="flex gap-3 pt-2">
-              <button type="submit" className="flex-1 bg-orange-500 hover:bg-orange-600 text-white font-bold py-2.5 rounded-xl text-sm transition-colors">Crear centro</button>
-              <button type="button" onClick={() => { setShowNuevoCentro(false); setNuevoCentroLat(''); setNuevoCentroLng('') }} className="px-5 py-2.5 border border-gray-200 rounded-xl text-gray-600 text-sm hover:bg-gray-50 transition-colors">Cancelar</button>
+              <button type="submit" disabled={guardandoCentro} className="flex-1 bg-orange-500 hover:bg-orange-600 disabled:opacity-50 text-white font-bold py-2.5 rounded-xl text-sm transition-colors">{guardandoCentro ? 'Guardando…' : 'Crear centro'}</button>
+              <button type="button" onClick={() => { setShowNuevoCentro(false); setNuevoCentroLat(''); setNuevoCentroLng(''); setNuevoCentroDireccion(''); setNuevoCiudadSeleccionada(''); setNuevoCentroRegion(''); setGeoMensaje(''); setNuevoCentroError(''); setMostrarMapaPicker(false) }} className="px-5 py-2.5 border border-gray-200 rounded-xl text-gray-600 text-sm hover:bg-gray-50 transition-colors">Cancelar</button>
             </div>
           </form>
         </Modal>

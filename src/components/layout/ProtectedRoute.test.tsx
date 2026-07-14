@@ -17,7 +17,7 @@ function renderProtected(requiredRole?: 'admin' | 'donador') {
       <Routes>
         <Route path="/login" element={<div>Login</div>} />
         <Route path="/" element={<div>Inicio</div>} />
-        <Route element={<ProtectedRoute requiredRole={requiredRole} />}>
+        <Route element={<ProtectedRoute allowedRoles={requiredRole ? [requiredRole] : undefined} />}>
           <Route path="/secreto" element={<div>Contenido protegido</div>} />
         </Route>
       </Routes>

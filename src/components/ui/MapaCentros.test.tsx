@@ -19,13 +19,13 @@ const centros: CentroAcopio[] = [
     id: 1, nombre: 'Centro Test', direccion: 'Av. Test 123', region: 'Metropolitana',
     ciudad: 'Santiago', horario: 'Lun-Vie 9-18', telefono: '+56 2 1234',
     queRecibe: ['Ropa'], capacidadActual: 100, capacidadMax: 200, activo: true,
-    coordenadas: { lat: -33.44, lng: -70.65 },
+    latitud: -33.44, longitud: -70.65,
   },
   {
     id: 2, nombre: 'Centro Inactivo', direccion: 'Av. X', region: 'Valparaíso',
     ciudad: 'Valparaíso', horario: '-', telefono: '-',
     queRecibe: [], capacidadActual: 0, capacidadMax: 100, activo: false,
-    coordenadas: { lat: -33.04, lng: -71.61 },
+    latitud: -33.04, longitud: -71.61,
   },
 ]
 

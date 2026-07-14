@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react'
 import { useDonacion } from '../contexts/DonacionContext'
 import type { DonacionExtendida, EvidenciaCampana } from '../types'
-import { mockDonaciones, mockEvidencias } from '../lib/mockData'
+import { mockEvidencias } from '../lib/mockData'
 import api from '../lib/axios'
 
 interface BffDonacion {
@@ -12,6 +12,9 @@ interface BffDonacion {
   fecha: string
   tipoDonacion?: string
   estado?: string
+  esEmpresa?: boolean
+  nombreEmpresa?: string
+  requiereAprobacion?: boolean
 }
 
 interface TransparenciaResponse {
@@ -31,7 +34,7 @@ function formatDate(fecha: unknown): string {
   return isNaN(d.getTime()) ? '—' : d.toLocaleDateString('es-CL')
 }
 
-function mapBffDonacion(b: BffDonacion): DonacionExtendida {
+function mapBffDonacion(b: BffDonacion): DonacionExtendida & { esEmpresa?: boolean; nombreEmpresa?: string; requiereAprobacion?: boolean } {
   return {
     id: b.id,
     donadorNombre: b.donadorNombre ?? 'Anónimo',
@@ -42,6 +45,9 @@ function mapBffDonacion(b: BffDonacion): DonacionExtendida {
     anonima: b.donadorNombre === null,
     estado: (b.estado as DonacionExtendida['estado']) ?? 'completada',
     tipo: (b.tipoDonacion?.toLowerCase() as DonacionExtendida['tipo']) ?? 'monetaria',
+    esEmpresa: b.esEmpresa,
+    nombreEmpresa: b.nombreEmpresa,
+    requiereAprobacion: b.requiereAprobacion,
   }
 }
 
@@ -117,7 +123,7 @@ export default function Transparencia() {
         const rawList: BffDonacion[] = Array.isArray(data) ? data : (data.donaciones ?? [])
         setDonaciones(rawList.map(mapBffDonacion))
       } catch {
-        setDonaciones(mockDonaciones)
+        setDonaciones([])
       } finally {
         setDataLoading(false)
       }
@@ -266,13 +272,21 @@ export default function Transparencia() {
                       <tr><td colSpan={7} className="px-6 py-12 text-center text-gray-400">No se encontraron donaciones con ese filtro.</td></tr>
                     ) : (
                       donacionesFiltradas.map(d => (
-                        <tr key={d.id} className="hover:bg-gray-50/50 transition-colors">
+                        <tr key={d.id} className={`hover:bg-gray-50/50 transition-colors ${(d as any).requiereAprobacion ? 'bg-yellow-50/40' : ''}`}>
                           <td className="px-6 py-4">
                             <div className="flex items-center gap-2.5">
-                              <div className="w-8 h-8 rounded-full bg-orange-100 flex items-center justify-center text-orange-600 font-bold text-xs flex-shrink-0">
-                                {d.anonima || !d.donadorNombre ? '?' : d.donadorNombre[0]}
+                              <div className={`w-8 h-8 rounded-full flex items-center justify-center font-bold text-xs flex-shrink-0 ${(d as any).esEmpresa ? 'bg-blue-100 text-blue-600' : 'bg-orange-100 text-orange-600'}`}>
+                                {(d as any).esEmpresa ? '🏢' : (d.anonima || !d.donadorNombre ? '?' : d.donadorNombre[0])}
                               </div>
-                              <span className="font-medium text-gray-900">{d.anonima ? 'Anónimo' : d.donadorNombre}</span>
+                              <div>
+                                <span className="font-medium text-gray-900">{d.anonima ? 'Anónimo' : d.donadorNombre}</span>
+                                {(d as any).esEmpresa && (
+                                  <span className="ml-2 text-xs bg-blue-100 text-blue-700 px-1.5 py-0.5 rounded font-medium">Empresa</span>
+                                )}
+                                {(d as any).requiereAprobacion && (
+                                  <span className="ml-1 text-xs bg-yellow-100 text-yellow-700 px-1.5 py-0.5 rounded font-medium">Pendiente aprobación</span>
+                                )}
+                              </div>
                             </div>
                           </td>
                           <td className="px-6 py-4 text-gray-600 max-w-[160px]"><span className="truncate block">{d.causaTitulo}</span></td>

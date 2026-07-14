@@ -40,7 +40,7 @@ export default function MapaCentros({ centros }: Props) {
         center={[-35.675, -71.543]}
         zoom={5}
         style={{ height: '100%', width: '100%' }}
-        scrollWheelZoom={false}
+        scrollWheelZoom={true}
       >
         <TileLayer
           attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>'
@@ -55,7 +55,18 @@ export default function MapaCentros({ centros }: Props) {
               <div className="min-w-[180px]">
                 <p className="font-bold text-gray-900 mb-1">{centro.nombre}</p>
                 <p className="text-xs text-gray-600 mb-1">{centro.direccion}</p>
-                <p className="text-xs text-gray-500 mb-2">{centro.horario}</p>
+                <p className="text-xs text-gray-500 mb-1">{centro.horario}</p>
+                {centro.capacidadMax > 0 && (() => {
+                  const pct = Math.round((centro.capacidadActual / centro.capacidadMax) * 100)
+                  const color = pct >= 90 ? 'text-red-600' : pct >= 70 ? 'text-amber-600' : 'text-green-700'
+                  const nivel = pct >= 90 ? 'Crítica' : pct >= 70 ? 'Alta' : pct >= 40 ? 'Media' : 'Baja'
+                  return (
+                    <p className={`text-xs font-semibold mb-2 ${color}`}>
+                      Ocupación: {pct}% — {nivel}
+                      {pct > 100 && <span> (sobre capacidad)</span>}
+                    </p>
+                  )
+                })()}
                 {centro.queRecibe.length > 0 && (
                   <div>
                     <p className="text-xs font-semibold text-orange-600 mb-1">Recibe:</p>

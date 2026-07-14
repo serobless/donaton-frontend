@@ -52,7 +52,7 @@ export default function Login() {
   const [modo, setModo] = useState<'login' | 'registro'>(
     params.get('modo') === 'registro' ? 'registro' : 'login'
   )
-  const [form, setForm] = useState({ nombre: '', email: '', password: '', confirmar: '', rut: '', telefono: '', region: '' })
+  const [form, setForm] = useState({ nombre: '', email: '', password: '', confirmar: '', rut: '', telefono: '', region: '', esEmpresa: false, nombreEmpresa: '', rutEmpresa: '' })
   const [error, setError] = useState('')
   const [loading, setLoading] = useState(false)
   const { login, register, isAuthenticated } = useAuth()
@@ -70,6 +70,12 @@ export default function Login() {
   function handleRutChange(e: React.ChangeEvent<HTMLInputElement>) {
     const raw = e.target.value.replace(/[^0-9kK]/g, '')
     setForm((f) => ({ ...f, rut: formatRut(raw) }))
+    setError('')
+  }
+
+  function handleRutEmpresaChange(e: React.ChangeEvent<HTMLInputElement>) {
+    const raw = e.target.value.replace(/[^0-9kK]/g, '')
+    setForm((f) => ({ ...f, rutEmpresa: formatRut(raw) }))
     setError('')
   }
 
@@ -97,6 +103,18 @@ export default function Login() {
           setLoading(false)
           return
         }
+        if (form.esEmpresa) {
+          if (!form.nombreEmpresa.trim()) {
+            setError('El nombre de la empresa es requerido')
+            setLoading(false)
+            return
+          }
+          if (!validateRutDv(form.rutEmpresa)) {
+            setError('El RUT de la empresa no es válido')
+            setLoading(false)
+            return
+          }
+        }
         await register({
           nombre: form.nombre,
           email: form.email,
@@ -104,6 +122,9 @@ export default function Login() {
           rut: form.rut,
           telefono: form.telefono || undefined,
           region: form.region || undefined,
+          esEmpresa: form.esEmpresa,
+          nombreEmpresa: form.esEmpresa ? form.nombreEmpresa : undefined,
+          rutEmpresa: form.esEmpresa ? form.rutEmpresa : undefined,
         })
       }
       navigate('/')
@@ -267,6 +288,58 @@ export default function Login() {
                   ))}
                 </select>
               </div>
+            )}
+
+            {modo === 'registro' && (
+              <div className="pt-1">
+                <label className="flex items-center gap-3 cursor-pointer select-none">
+                  <button
+                    type="button"
+                    onClick={() => setForm((f) => ({ ...f, esEmpresa: !f.esEmpresa, nombreEmpresa: '', rutEmpresa: '' }))}
+                    className={`relative w-10 h-6 rounded-full transition-colors flex-shrink-0 ${form.esEmpresa ? 'bg-orange-500' : 'bg-gray-200'}`}
+                  >
+                    <span className={`absolute top-1 w-4 h-4 bg-white rounded-full shadow transition-all ${form.esEmpresa ? 'left-5' : 'left-1'}`} />
+                  </button>
+                  <span className="text-sm text-gray-700">Registrarme como empresa</span>
+                </label>
+              </div>
+            )}
+
+            {modo === 'registro' && form.esEmpresa && (
+              <>
+                <div className="bg-blue-50 border border-blue-100 rounded-xl px-4 py-3 text-xs text-blue-700">
+                  Las donaciones que realices quedarán registradas como donación empresarial y aparecerán con el nombre de tu empresa.
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1.5">
+                    Nombre de la empresa <span className="text-red-400">*</span>
+                  </label>
+                  <input
+                    type="text"
+                    name="nombreEmpresa"
+                    value={form.nombreEmpresa}
+                    onChange={handleChange}
+                    required
+                    placeholder="Mi Empresa S.A."
+                    className="w-full border border-gray-200 rounded-xl px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-orange-400 focus:border-transparent transition"
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1.5">
+                    RUT empresa <span className="text-red-400">*</span>
+                  </label>
+                  <input
+                    type="text"
+                    name="rutEmpresa"
+                    value={form.rutEmpresa}
+                    onChange={handleRutEmpresaChange}
+                    required
+                    placeholder="76.123.456-7"
+                    maxLength={12}
+                    className="w-full border border-gray-200 rounded-xl px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-orange-400 focus:border-transparent transition"
+                  />
+                </div>
+              </>
             )}
 
             {error && (

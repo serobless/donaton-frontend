@@ -44,8 +44,11 @@ export default function Navbar() {
             {isAuthenticated && (
               <NavLink to="/donaciones" className={linkClass}>Mis donaciones</NavLink>
             )}
-            {user?.rol?.toLowerCase() === 'admin' && (
+            {user?.rol === 'admin' && (
               <NavLink to="/dashboard" className={linkClass}>Dashboard</NavLink>
+            )}
+            {user?.rol === 'centro_admin' && (
+              <NavLink to="/mi-centro" className={linkClass}>Mi Centro</NavLink>
             )}
           </nav>
 
@@ -59,9 +62,18 @@ export default function Navbar() {
                       {user?.nombre[0]}
                     </span>
                   </div>
-                  <span className="text-sm font-medium text-gray-700">
-                    {user?.nombre.split(' ')[0]}
-                  </span>
+                  <div className="flex flex-col items-start leading-none">
+                    <span className="text-sm font-medium text-gray-700">{user?.nombre.split(' ')[0]}</span>
+                    {user?.rol && user.rol !== 'donador' && (
+                      <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded-full mt-0.5 ${
+                        user.rol === 'admin'        ? 'bg-purple-100 text-purple-700' :
+                        user.rol === 'empresa'      ? 'bg-blue-100   text-blue-700'   :
+                        user.rol === 'centro_admin' ? 'bg-teal-100   text-teal-700'   : ''
+                      }`}>
+                        {user.rol === 'admin' ? 'Admin' : user.rol === 'empresa' ? 'Empresa' : 'Encargado'}
+                      </span>
+                    )}
+                  </div>
                 </div>
                 <button
                   onClick={handleLogout}
@@ -113,7 +125,8 @@ export default function Navbar() {
             { to: '/mapa-necesidades', label: 'Mapa de Necesidades' },
             { to: '/testimonios', label: 'Testimonios' },
             ...(isAuthenticated ? [{ to: '/donaciones', label: 'Mis donaciones' }] : []),
-            ...(user?.rol?.toLowerCase() === 'admin' ? [{ to: '/dashboard', label: 'Dashboard' }] : []),
+            ...(user?.rol === 'admin'        ? [{ to: '/dashboard', label: 'Dashboard' }] : []),
+            ...(user?.rol === 'centro_admin' ? [{ to: '/mi-centro', label: 'Mi Centro'  }] : []),
           ].map((item) => (
             <NavLink
               key={item.to}

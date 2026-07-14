@@ -2,10 +2,11 @@ export interface User {
   id: number
   nombre: string
   email: string
-  rol: 'admin' | 'donador'
+  rol: 'admin' | 'donador' | 'empresa' | 'centro_admin'
   avatar?: string
   fechaRegistro?: string
   totalDonaciones?: number
+  centroId?: number  // Para CENTRO_ADMIN: ID del centro que administra
 }
 
 export interface AuthState {
@@ -24,10 +25,15 @@ export interface Causa {
   recaudado: number
   categoria: string
   activa: boolean
-  fechaFin: string
+  fechaFin?: string
+  fechaInicio?: string
   diasRestantes?: number
   destacada?: boolean
   urgencia?: string
+  centroId?: number
+  centroNombre?: string
+  centro?: { id: number; nombre: string }
+  tipo?: string
 }
 
 export interface Campana {
@@ -66,6 +72,9 @@ export interface DonacionExtendida extends Donacion {
   destino?: string
   descripcion?: string
   centroNombre?: string
+  esEmpresa?: boolean
+  nombreEmpresa?: string
+  requiereAprobacion?: boolean
 }
 
 export interface TopDonador {
@@ -88,6 +97,9 @@ export interface RegisterData {
   rut: string
   telefono?: string
   region?: string
+  esEmpresa?: boolean
+  nombreEmpresa?: string
+  rutEmpresa?: string
 }
 
 export interface AuthResponse {
@@ -126,6 +138,7 @@ export interface CentroAcopio {
   activo: boolean
   latitud?: number
   longitud?: number
+  unidadCapacidad?: string
 }
 
 export interface Necesidad {
@@ -186,6 +199,7 @@ export interface Testimonio {
   autorNombre: string
   fechaCreacion: string
   imagenUrl?: string
+  aprobado?: boolean
 }
 
 export interface TestimonioRequest {
