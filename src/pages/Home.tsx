@@ -36,7 +36,7 @@ function AnimatedStat({ target, prefix = '', suffix = '', label, icon }: {
 }
 
 /* ─── Floating hero image ─── */
-function HeroImg({ src, size, className }: { src: string; size: 'sm' | 'md' | 'lg'; className?: string }) {
+function HeroImg({ src, className }: { src: string; size?: 'sm' | 'md' | 'lg'; className?: string }) {
   const dim = 'w-52 h-52'
   return (
     <div className={`absolute ${dim} rounded-full overflow-hidden ring-4 ring-white shadow-xl ${className ?? ''}`}>
@@ -62,7 +62,6 @@ const HERO_IMGS = {
   f: 'https://images.unsplash.com/photo-1559027615-cd4628902d4a?w=200&h=200&q=80&fit=crop',
 }
 
-const NIVEL_COLOR = ['fill-orange-100', 'fill-orange-200', 'fill-orange-300', 'fill-orange-400', 'fill-orange-500']
 
 /* Fotos de perfil para top donadores (por posición 0-4) */
 const DONADOR_FOTOS = [
